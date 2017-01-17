@@ -310,49 +310,7 @@ r
 We should make our decisions very transparent here. We should be able to justify our decision of 3 degrees of freedom over other possible values. 
 
 #### Density projections
-```{r}
 
-
-# Get the predctions from Population_trend script
-load("prediction.RData")
-# Read the polygons
-origins <- readShapePoly('Origins_updated.shp')
-
-# Extract data
-
-cells <- do.call(rbind, sapply(per.origin, subset, select = 1))
-#cells
-g.means <- apply(prediction[-cells, ], 2, mean, na.rm = TRUE) 
-g.gams <- apply(prediction[-cells, ], 2, sd, na.rm = TRUE)
-g.means2 <- apply(prediction[cells, ], 2, mean, na.rm = TRUE) 
-g.gams2 <- apply(prediction[cells, ], 2, sd, na.rm = TRUE)
-
-#pdf("Global_pop_trend_comparisson.pdf", width = 25, height = 20)
-par(mar = c(5, 7, 7, 5))
-plot(seq(0, 1, length.out = length(time)) ~ time, col = "white", main = "GLOBAL",
-     xlim = c(21, 4), ylab = "Population Density (standardized)", 
-     xlab = "Thousand of years ago", cex.lab = 1, cex.main = 1, cex.axis = 1)
-down <- g.means - g.gams
-up <- g.means + g.gams
-lines(y = down, x = time, lty = 3, col = "gray40", lwd = 3)
-lines(y = up, x = time, lty = 3, col = "gray40", lwd = 3)
-lines(y = g.means, x = time, lwd = 4)
-
-lines(y = g.means2, x = time, lwd = 3, col = "red")
-down2 <- g.means2 - g.gams2
-up2 <- g.means2 + g.gams2
-lines(y = down2, x = time, lty = 3, col = "red", lwd = 3)
-lines(y = up2, x = time, lty = 3, col = "red", lwd = 3)
-
-
-polygon(cbind(c(12, 8.2, 8.2, 12, 12), c(-1, -1, 2, 2, -1)),
-        col = rgb(0, 1, 0, alpha = .2), border = F)
-polygon(cbind(c(8.2, 4.2, 4.2, 8.2, 8.2), c(-1, -1, 2, 2, -1)),
-        col = rgb(.28, 0, .28, alpha = .2), border = F)
-#dev.off()
-
-
-```
 
 
 ```{r}
@@ -413,13 +371,94 @@ axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
 ```
 
 ```{r}
-global.means
-
+means_matrix <- matrix(rep(NA,19*20), 20, 19)
+colnames(means_matrix) <- c("origin", rev(seq(4, 21, by=1)))
+means_matrix[,1] <- names(global.means)
+for(i in 1:20){
+means_matrix[i,2:19] <- global.means[[i]]
+}
 ```
 
 ```{r}
-global.SD
+kable(means_matrix, caption= "Mean values")
 ```
+
+
+```{r}
+#global.SD
+
+SD_matrix <- matrix(rep(NA,19*20), 20, 19)
+colnames(SD_matrix) <- c("origin", rev(seq(4, 21, by=1)))
+SD_matrix[,1] <- names(global.SD)
+for(i in 1:20){
+SD_matrix[i,2:19] <- global.SD[[i]]
+}
+```
+
+```{r}
+kable(SD_matrix, caption= "SD values")
+```
+
+
+```{r}
+par(mfrow=c(5,4), mar=c(0,0,0,0))
+
+for(j in 1:20){
+plot(means_matrix[1,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[1,2:19]), type="n", xlab="year", ylab="Density", xaxt="n")
+
+
+lines(means_matrix[j,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[j,2:19]), type="b", xlab="year", ylab="Density", xaxt="n")
+}
+
+axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+
+```
+
+
+```{r}
+
+
+# Get the predctions from Population_trend script
+load("prediction.RData")
+# Read the polygons
+origins <- readShapePoly('Origins_updated.shp')
+
+# Extract data
+
+cells <- do.call(rbind, sapply(per.origin, subset, select = 1))
+#cells
+g.means <- apply(prediction[-cells, ], 2, mean, na.rm = TRUE) 
+g.gams <- apply(prediction[-cells, ], 2, sd, na.rm = TRUE)
+g.means2 <- apply(prediction[cells, ], 2, mean, na.rm = TRUE) 
+g.gams2 <- apply(prediction[cells, ], 2, sd, na.rm = TRUE)
+
+#pdf("Global_pop_trend_comparisson.pdf", width = 25, height = 20)
+par(mar = c(5, 7, 7, 5))
+plot(seq(0, 1, length.out = length(time)) ~ time, col = "white", main = "GLOBAL",
+     xlim = c(21, 4), ylab = "Population Density (standardized)", 
+     xlab = "Thousand of years ago", cex.lab = 1, cex.main = 1, cex.axis = 1)
+down <- g.means - g.gams
+up <- g.means + g.gams
+lines(y = down, x = time, lty = 3, col = "gray40", lwd = 3)
+lines(y = up, x = time, lty = 3, col = "gray40", lwd = 3)
+lines(y = g.means, x = time, lwd = 4)
+
+lines(y = g.means2, x = time, lwd = 3, col = "red")
+down2 <- g.means2 - g.gams2
+up2 <- g.means2 + g.gams2
+lines(y = down2, x = time, lty = 3, col = "red", lwd = 3)
+lines(y = up2, x = time, lty = 3, col = "red", lwd = 3)
+
+
+polygon(cbind(c(12, 8.2, 8.2, 12, 12), c(-1, -1, 2, 2, -1)),
+        col = rgb(0, 1, 0, alpha = .2), border = F)
+polygon(cbind(c(8.2, 4.2, 4.2, 8.2, 8.2), c(-1, -1, 2, 2, -1)),
+        col = rgb(.28, 0, .28, alpha = .2), border = F)
+#dev.off()
+
+
+```
+
 #### Productivity
 ```{r}
 # Load patricks productivity PCA data
