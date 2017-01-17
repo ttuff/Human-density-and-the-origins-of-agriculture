@@ -15,17 +15,21 @@ output:
 
 
 ## Code
-1. [Environment setup](#environment-setup)
+1. [R environment setup](#r-environment-setup)
 2. [Setting time breaks](#setting-time-breaks)
 3. [Defining origins](#defining-origins)
-4. ## Import raster data
+4. [Import raster data](#import-raster-data)
 5. [GAM smoothing models](#gam-smoothing-models)
 6. [Compare rates between origins and not-origins](#compare-rates-between-origins-and-not-origins)
-7. [Setup final figure](#setup-final-figure)
-8. [Map for final figure](#map-for-final-figure)
-9. [Trend through time panel for final figure](#trend-through-time-panel)
-10. [Assemble and print final figure](#assemble-the-figure)
+7. [Compare rates between different time periods](#compare-rates-between-different-time-periods)
+8. [Setup final figure](#setup-final-figure)
+9. [Map for final figure](#map-for-final-figure)
+10. [Trend through time panel for final figure](#trend-through-time-panel)
+11. [Assemble and print final figure](#assemble-the-figure)
 
+
+
+## R environment setup
 #### Attach libraries
 ```{r}
 library(png)
@@ -36,7 +40,6 @@ library(gam)
 
 
 
-## Environment setup
 #### Set working directory
 ```{r}
 setwd("~/Desktop/Botero postdoc 2016/Human density and the origins of agriculture/")
@@ -240,7 +243,7 @@ There is a choice of two methods here. At the end of this section we need to pri
 
 
 
-#### Defining origins
+## Defining origins
 ![](Larson_origins.jpg)
 
 
@@ -299,11 +302,61 @@ r
 
 
 ## GAM smoothing models
-#### GAM model with different degrees of freedom
+#### Justification for General Adative Models.
+  We need to justify our decision to use a GAM over other models. This should include citations to back up those arguments. 
+
+
+### Fit and plot GAM model with different degrees of freedom
+We should make our decisions very transparent here. We should be able to justify our decision of 3 degrees of freedom over other possible values. 
+
+#### Density projections
+```{r}
+
+
+# Get the predctions from Population_trend script
+load("prediction.RData")
+# Read the polygons
+origins <- readShapePoly('Origins_updated.shp')
+
+# Extract data
+
+cells <- do.call(rbind, sapply(per.origin, subset, select = 1))
+#cells
+g.means <- apply(prediction[-cells, ], 2, mean, na.rm = TRUE) 
+g.gams <- apply(prediction[-cells, ], 2, sd, na.rm = TRUE)
+g.means2 <- apply(prediction[cells, ], 2, mean, na.rm = TRUE) 
+g.gams2 <- apply(prediction[cells, ], 2, sd, na.rm = TRUE)
+
+#pdf("Global_pop_trend_comparisson.pdf", width = 25, height = 20)
+par(mar = c(5, 7, 7, 5))
+plot(seq(0, 1, length.out = length(time)) ~ time, col = "white", main = "GLOBAL",
+     xlim = c(21, 4), ylab = "Population Density (standardized)", 
+     xlab = "Thousand of years ago", cex.lab = 1, cex.main = 1, cex.axis = 1)
+down <- g.means - g.gams
+up <- g.means + g.gams
+lines(y = down, x = time, lty = 3, col = "gray40", lwd = 3)
+lines(y = up, x = time, lty = 3, col = "gray40", lwd = 3)
+lines(y = g.means, x = time, lwd = 4)
+
+lines(y = g.means2, x = time, lwd = 3, col = "red")
+down2 <- g.means2 - g.gams2
+up2 <- g.means2 + g.gams2
+lines(y = down2, x = time, lty = 3, col = "red", lwd = 3)
+lines(y = up2, x = time, lty = 3, col = "red", lwd = 3)
+
+
+polygon(cbind(c(12, 8.2, 8.2, 12, 12), c(-1, -1, 2, 2, -1)),
+        col = rgb(0, 1, 0, alpha = .2), border = F)
+polygon(cbind(c(8.2, 4.2, 4.2, 8.2, 8.2), c(-1, -1, 2, 2, -1)),
+        col = rgb(.28, 0, .28, alpha = .2), border = F)
+#dev.off()
+
+
+```
 
 
 ```{r}
-
+# need to add a global mean, an everything but the origins mean, and a buffer around the origins mean. 
 
 # Read the polygons
 origins <- readShapePoly('Origins_updated.shp')
@@ -319,7 +372,7 @@ std <- function(x) {
 }
 
 # Calculating mean and 
-global.means <- global.gams <- list()
+global.means <- global.SD <- list()
 
 for (j in 1:length(per.origin)) {
   #print(j)
@@ -338,7 +391,7 @@ for (j in 1:length(per.origin)) {
     predictions[i, ] <- predict(model)
   }
   global.means[[j]] <- apply(predictions, 2, mean) 
-  global.gams[[j]] <- apply(predictions, 2, sd)
+  global.SD[[j]] <- apply(predictions, 2, sd)
 }
 
 
@@ -347,11 +400,17 @@ origin.time.region <- c(2, 2, 1, 1, 1, 2, 2, 1, 2, 2,
                         2, 2, 1, 2, 2, 2, 2, 2, 2, 2) # 1 = early; 2 = middle
 
 names(global.means) <- paste(names(per.origin), "Means")
-names(global.gams) <- paste(names(per.origin), "GAMs")
+names(global.SD) <- paste(names(per.origin), "SD")
 
-origin.time.region
+
+
+
 ```
 
+```{r}
+plot(global.means[[1]], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(global.means[[1]]), type="b", xlab="year", ylab="Density", xaxt="n")
+axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+```
 
 ```{r}
 global.means
@@ -359,7 +418,46 @@ global.means
 ```
 
 ```{r}
-global.gams
+global.SD
+```
+#### Productivity
+```{r}
+# Load patricks productivity PCA data
+load('Productivity_ALL.RDATA')
+
+# Load origin shapefiles
+origins <- readShapePoly('Origins_updated.shp')
+
+origin.time.region <- c(2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 
+                        2, 2, 1, 2, 2, 2, 2, 2, 2, 2) # 1 = early; 2 = middle
+
+
+# Extract the data
+prod.origin <- extract(Productivity.ALL, origins)
+# Mean and SD per region
+means <- lapply(prod.origin, colMeans, na.rm = TRUE)
+sds <- lapply(prod.origin, sd, na.rm = TRUE)
+names(means) <- origins@data$CONTINENT
+ymax <- max(unlist(means))
+ymin <- min(unlist(means))
+time <- 4:21
+
+# Plot
+#pdf("productivity.pdf", 20, 30) 
+par(mfrow = c(5, 4), mar = c(2, 2, 2, 0))
+for (i in 1:length(means)) {
+  plot(y = means[[i]], x = time, xlim = c(21, 4), ylim = c(ymin, ymax),
+       main = names(means)[i], cex.main = 1, cex.lab = 1, cex.axis = 1,
+       ylab = "Productivity (PCA axis)", xlab = "Thousand of years ago (k)",
+       pch = 20, lwd = 1, type = "l", 
+       col = c("purple", "green")[origin.time.region[i]])
+  up <- sds[[i]] + means[[i]]
+  down <-  means[[i]] - sds[[i]]
+  lines(up ~ time, lty = 2)
+  lines(down ~ time, lty = 2)
+  
+}
+#dev.off()
 ```
 
 
@@ -367,7 +465,7 @@ global.gams
 
 ##Compare rates between origins and not-origins
 
-
+##Compare rates between different time periods
 
 
 ##Setup final figure
@@ -383,7 +481,7 @@ a <- layout(matrix(c(
 layout.show(a)
 ```
 
-#### Make blank templates plots
+#### Make blank template plots
 ```{r}
 frameplot <- function(){
 	plot(21:0,rep(0, 22), xlim=c(17,4), ylim=c(0, 2.25), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
@@ -485,7 +583,7 @@ y_seq <- 2+c(0, j(seq(0, maxer, length.out=100)))
 			
 	
 		#abline(v=11)
-	type <- 2
+	type <- 1
 		
 		if(type == 1){
 	x <- c(means[[i]] , means[[i]]  + abs(sds[[i]]), means[[i]]  - abs(sds[[i]]))
@@ -555,6 +653,13 @@ means_long_x <- c(0:4, 4:21)
 }
 
 
+```
+
+```{r}
+frameplot()
+complex_figure(7, 1, global.means, global.SD) 
+axis(1)
+axis(2)
 ```
 
 
