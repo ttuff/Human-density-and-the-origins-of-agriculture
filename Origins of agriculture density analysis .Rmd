@@ -117,7 +117,8 @@ mtext("Middle Holocene", 3, line= -1, adj=.6)
 ```{r}
 
 par(mfrow=c(2,3), mar=c(4,4,2,0))
-specific_dates <- domestication_times[3:9]
+dim(domestication_times)
+specific_dates <- domestication_times[,3:8]
 
 for(i in c(1, 3, 5, 2, 4, 6)){
 hist(specific_dates[,i], breaks = 22, xlim=c(15,0), xlab="Thousand years ago", col=adjustcolor("cornflowerblue", alpha= 0.5), border=adjustcolor("cornflowerblue", alpha= 0.9), main= names(specific_dates)[i])
@@ -311,24 +312,111 @@ We should make our decisions very transparent here. We should be able to justify
 
 #### Density projections
 
+```{r, cache=TRUE}
+# Read the polygons
+origins <- readShapePoly('Origins_updated.shp')
+```
 
 
 ```{r}
-# need to add a global mean, an everything but the origins mean, and a buffer around the origins mean. 
-
-# Read the polygons
-origins <- readShapePoly('Origins_updated.shp')
-
 # Extract data
 per.origin <- extract(r, origins, cellnumber = TRUE, buffer = 100000)
 names(per.origin) <- origins@data[, 1]
 
+str(per.origin)
+```
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+for(h in 1:20){
+#h <- 3
+originI <- Pop[per.origin[[h]][, 1], ]
+x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
+x_value_vector <- as.vector(x_values)
+y_value_vector <- scale(as.vector(originI))
+density_trend <- cbind(x_value_vector, y_value_vector)
+plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-10,10), xlim=c(21,4))
+
+points(density_trend, cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+
+}
+```
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+for(h in 1:20){
+#h <- 3
+originI <- Pop[per.origin[[h]][, 1], ]
+x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
+x_value_vector <- as.vector(x_values)
+y_value_vector <- scale(as.vector(originI))
+density_trend <- cbind(x_value_vector, y_value_vector)
+plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-4,8), xlim=c(21,4))
+
+points(density_trend, cex=0.5, col=adjustcolor("grey", 0.1))
+gammer <- loess(density_trend[,2] ~ density_trend[,1] )
+summary(gammer)
+lines(density_trend[,1] ,predict(gammer),  col="cornflowerblue", lwd=2)
+
+
+
+}
+
+
+
+
+```
+
+span	
+the parameter α which controls the degree of smoothing.
+
+The size of the neighbourhood is controlled by α (set by span or enp.target). For α < 1, the neighbourhood includes proportion α of the points, and these have tricubic weighting (proportional to (1 - (dist/maxdist)^3)^3). For α > 1, all points are used, with the ‘maximum distance’ assumed to be α^(1/p) times the actual maximum distance for p explanatory variables.
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+for(h in 1:20){
+#h <- 3
+originI <- Pop[per.origin[[h]][, 1], ]
+x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
+x_value_vector <- as.vector(x_values)
+y_value_vector <- scale(as.vector(originI))
+
+density_trend <- cbind(x_value_vector, y_value_vector)
+
+#points(density_trend, cex=0.5)
+gammer <- loess(density_trend[,2] ~ density_trend[,1], span = .5)
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-1.35,1.35), xlim=c(21,4))
+
+
+polygon(x=c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x=c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+abline(h=0, lty=2, col="grey")
+
+lines(density_trend[,1] ,predict_gam$fit,  col="cornflowerblue")
+lines(density_trend[,1] ,  predict_gam$fit + predict_gam$se.fit,  col="grey", lty=1)
+lines(density_trend[,1] ,  predict_gam$fit - predict_gam$se.fit,  col="grey", lty=1)
+
+
+}
+
+```
+
+
+```{r}
+# need to add a global mean, an everything but the origins mean, and a buffer around the origins mean. 
 # Function standardization
 std <- function(x) {
   b <- (x - min(x)) / (max(x) - min(x))
   return(rev(b))
 }
 
+
+diff_df <- function(h){ 
 # Calculating mean and 
 global.means <- global.SD <- list()
 
@@ -344,7 +432,7 @@ for (j in 1:length(per.origin)) {
   for(i in 1:nJ) {
     
     # Need to show a gradient of these df values. 
-    model <- gam(b[, i] ~ s(time, df = 15))
+    model <- gam(b[, i] ~ s(time, df = h))
     col <- sample(rainbow(100), 1)
     predictions[i, ] <- predict(model)
   }
@@ -353,22 +441,42 @@ for (j in 1:length(per.origin)) {
 }
 
 
-
-origin.time.region <- c(2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 
-                        2, 2, 1, 2, 2, 2, 2, 2, 2, 2) # 1 = early; 2 = middle
-
 names(global.means) <- paste(names(per.origin), "Means")
 names(global.SD) <- paste(names(per.origin), "SD")
 
-
+return(list(global.means, global.SD))
+}
 
 
 ```
 
 ```{r}
-plot(global.means[[1]], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(global.means[[1]]), type="b", xlab="year", ylab="Density", xaxt="n")
+# Confirm that the x-axis is oriented correctly
+for_3 <- diff_df(1)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+i <- 1
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,20))
+
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+originI <- Pop[per.origin[[i]][, 1], ]
+for(j in 1:18){
+points(23- c(jitter(rep(4, length(originI[,j])), 4.5)  + j), originI[,j], pch=19, cex=.1)
+}
+
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]], type="b", pch=names(global.means[[i]]))
+
 axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[1], 3, line=-2)
+
 ```
+
 
 ```{r}
 means_matrix <- matrix(rep(NA,19*20), 20, 19)
@@ -401,12 +509,16 @@ kable(SD_matrix, caption= "SD values")
 
 
 ```{r}
-par(mfrow=c(5,4), mar=c(0,0,0,0))
+par(mfrow=c(4,5), mar=c(0,0,0,0))
 
 for(j in 1:20){
-plot(means_matrix[1,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[1,2:19]), type="n", xlab="year", ylab="Density", xaxt="n")
+plot(means_matrix[1,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[1,2:19]), type="n", xlab="year", ylab="Density", xaxt="n", ylim=c(0,1))
 
-
+originI <- Pop[per.origin[[j]][, 1], ]
+for(h in 1:18){
+points(23- c(jitter(rep(4, length(originI[,h])), 4.5)  + h), originI[,h], pch=19, cex=.1)
+}
+  
 lines(means_matrix[j,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[j,2:19]), type="b", xlab="year", ylab="Density", xaxt="n")
 }
 
@@ -415,49 +527,201 @@ axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
 ```
 
 
+
+
 ```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
 
+for_3 <- diff_df(1)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
 
-# Get the predctions from Population_trend script
-load("prediction.RData")
-# Read the polygons
-origins <- readShapePoly('Origins_updated.shp')
+for(i in 1:20){
+  
 
-# Extract data
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
 
-cells <- do.call(rbind, sapply(per.origin, subset, select = 1))
-#cells
-g.means <- apply(prediction[-cells, ], 2, mean, na.rm = TRUE) 
-g.gams <- apply(prediction[-cells, ], 2, sd, na.rm = TRUE)
-g.means2 <- apply(prediction[cells, ], 2, mean, na.rm = TRUE) 
-g.gams2 <- apply(prediction[cells, ], 2, sd, na.rm = TRUE)
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
 
-#pdf("Global_pop_trend_comparisson.pdf", width = 25, height = 20)
-par(mar = c(5, 7, 7, 5))
-plot(seq(0, 1, length.out = length(time)) ~ time, col = "white", main = "GLOBAL",
-     xlim = c(21, 4), ylab = "Population Density (standardized)", 
-     xlab = "Thousand of years ago", cex.lab = 1, cex.main = 1, cex.axis = 1)
-down <- g.means - g.gams
-up <- g.means + g.gams
-lines(y = down, x = time, lty = 3, col = "gray40", lwd = 3)
-lines(y = up, x = time, lty = 3, col = "gray40", lwd = 3)
-lines(y = g.means, x = time, lwd = 4)
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))  
+  
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
 
-lines(y = g.means2, x = time, lwd = 3, col = "red")
-down2 <- g.means2 - g.gams2
-up2 <- g.means2 + g.gams2
-lines(y = down2, x = time, lty = 3, col = "red", lwd = 3)
-lines(y = up2, x = time, lty = 3, col = "red", lwd = 3)
-
-
-polygon(cbind(c(12, 8.2, 8.2, 12, 12), c(-1, -1, 2, 2, -1)),
-        col = rgb(0, 1, 0, alpha = .2), border = F)
-polygon(cbind(c(8.2, 4.2, 4.2, 8.2, 8.2), c(-1, -1, 2, 2, -1)),
-        col = rgb(.28, 0, .28, alpha = .2), border = F)
-#dev.off()
-
-
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
 ```
+GAM model using one degree of freedom
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(2)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using two degree of freedom
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(3)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using three degree of freedom
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(4)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using four degree of freedom
+
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(5)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using 5 degree of freedom
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(10)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))  
+  
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using 10 degree of freedom
+
+
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(12)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))  
+  
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using 12 degree of freedom
+
+
+
+
+```{r}
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+
+for_3 <- diff_df(17)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+for(i in 1:20){
+plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))   
+  
+polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
+lines(global.means[[i]])
+
+#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
+mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
+}
+```
+GAM model using 17 degree of freedom
+
+
 
 #### Productivity
 ```{r}
