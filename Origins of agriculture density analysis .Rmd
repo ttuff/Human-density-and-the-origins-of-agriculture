@@ -327,42 +327,91 @@ str(per.origin)
 ```
 
 ```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
+all_vectors <- rep(NA, 3)
+
 for(h in 1:20){
-#h <- 3
 originI <- Pop[per.origin[[h]][, 1], ]
 x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
 x_value_vector <- as.vector(x_values)
-y_value_vector <- scale(as.vector(originI))
-density_trend <- cbind(x_value_vector, y_value_vector)
-plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-10,10), xlim=c(21,4))
-
-points(density_trend, cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
-
+y_value_vector <- as.vector(originI)
+all_vectors_pre <- cbind(rep(names(per.origin)[h], length(x_value_vector)),x_value_vector, y_value_vector)
+all_vectors <- rbind(all_vectors, all_vectors_pre)
 }
+all_vectors <- as.data.frame(all_vectors)
+all_vectors <- cbind(all_vectors, scale(as.numeric(all_vectors[,3])))
+colnames(all_vectors) <- c("location_name", "x_values", "density_values", "scaled_density_values")
+
+all_vectors
+```
+
+```{r}
+#not in origin
+
+
+```
+
+
+
+
+```{r}
+
+par(mfrow=c(4,5), mar=c(0,0,0,0))
+for(h in 1:18){
+#h <- 3
+density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
+
+points(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+}
+
+#all origins
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
+
+points(as.numeric(all_vectors[,2]), as.numeric(all_vectors[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+
 ```
 
 ```{r}
 par(mfrow=c(4,5), mar=c(0,0,0,0))
-for(h in 1:20){
+for(h in 1:18){
 #h <- 3
-originI <- Pop[per.origin[[h]][, 1], ]
-x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
-x_value_vector <- as.vector(x_values)
-y_value_vector <- scale(as.vector(originI))
-density_trend <- cbind(x_value_vector, y_value_vector)
-plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-4,8), xlim=c(21,4))
+density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
 
-points(density_trend, cex=0.5, col=adjustcolor("grey", 0.1))
-gammer <- loess(density_trend[,2] ~ density_trend[,1] )
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(4,21), type="n", xaxt="n", yaxt="n")
+
+points(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), cex=0.5, col=adjustcolor("grey", 0.5))
+
+
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]))
 summary(gammer)
-lines(density_trend[,1] ,predict(gammer),  col="cornflowerblue", lwd=2)
 
 
+lines(as.numeric(ordered_density_trend[,2]) ,predict(gammer),  col="cornflowerblue", lwd=2)
 
 }
 
+density_trend <- all_vectors[-1,]
 
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(4,21), type="n", xaxt="n", yaxt="n")
+
+points(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), cex=0.5, col=adjustcolor("grey", 0.5))
+
+
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]))
+summary(gammer)
+
+
+length(ordered_density_trend[,2])
+length(predict(gammer))
+
+lines(as.numeric(ordered_density_trend[,2]) ,predict(gammer),  col="cornflowerblue", lwd=2)
 
 
 ```
@@ -374,37 +423,74 @@ The size of the neighbourhood is controlled by α (set by span or enp.target). F
 
 ```{r}
 par(mfrow=c(4,5), mar=c(0,0,0,0))
-for(h in 1:20){
+for(h in 1:18){
 #h <- 3
-originI <- Pop[per.origin[[h]][, 1], ]
-x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
-x_value_vector <- as.vector(x_values)
-y_value_vector <- scale(as.vector(originI))
+density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
 
-density_trend <- cbind(x_value_vector, y_value_vector)
-
-#points(density_trend, cex=0.5)
-gammer <- loess(density_trend[,2] ~ density_trend[,1], span = .5)
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = .5)
 summary(gammer)
 predict_gam <- predict(gammer, se=TRUE)
 
-plot(density_trend, col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(-1.35,1.35), xlim=c(21,4))
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(0,21), type="n", xaxt="n", yaxt="n")
+#axis(1, label= seq(4,21, by=1), at=rev(seq(1,18, by=1)))
 
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
 
-polygon(x=c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x=c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+polygon(x=22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
 
 abline(h=0, lty=2, col="grey")
 
-lines(density_trend[,1] ,predict_gam$fit,  col="cornflowerblue")
-lines(density_trend[,1] ,  predict_gam$fit + predict_gam$se.fit,  col="grey", lty=1)
-lines(density_trend[,1] ,  predict_gam$fit - predict_gam$se.fit,  col="grey", lty=1)
+lines(ordered_density_trend[,2] ,predict_gam$fit,  col="cornflowerblue")
+lines(ordered_density_trend[,2] ,  predict_gam$fit + predict_gam$se.fit,  col="grey", lty=1)
+lines(ordered_density_trend[,2] ,  predict_gam$fit - predict_gam$se.fit,  col="grey", lty=1)
 
 
+mtext(as.character(ordered_density_trend[1,1]), 3, line=-1, cex=0.5)
 }
 
 ```
+
+```{r}
+par(mfrow=c(2,5), mar=c(0,0,0,0))
+for(j in seq(0.2, 2, by=.2)){
+
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(0,21), type="n", xaxt="n")
+axis(1, label= seq(4,21, by=1), at=rev(seq(1,18, by=1)))
+
+
+polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
+
+polygon(x=22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
+
+
+for(h in 1:18){
+#h <- 3
+density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = j)
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+abline(h=0, lty=2, col="grey")
+
+lines(ordered_density_trend[,2] ,predict_gam$fit,  col="cornflowerblue")
+
+}
+mtext(paste("span = ", j), 3, line=-3, cex=0.5)
+}
+```
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
