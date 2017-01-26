@@ -36,6 +36,9 @@ library(png)
 library(maptools)
 library(raster)
 library(gam)
+
+library(mapproj)
+library(rgl)
 ```
 
 
@@ -247,22 +250,6 @@ There is a choice of two methods here. At the end of this section we need to pri
 ## Defining origins
 ![](Larson_origins.jpg)
 
-
-```{r}
-origins <- readShapePoly('Origins_updated.shp')
-
-origin.time.region <- c(2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 
-                        2, 2, 1, 2, 2, 2, 2, 2, 2, 2) # 1 = early; 2 = middle
-as.character(origins$CONTINENT)
-
-#subset_order <- c(1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 17, 18)
-subset_order <- c(8, 10, 9, 5, 18, 7, 6, 20, 1, 2, 13, 16)
-origins_subset <- origins[subset_order,]
-origins_subset$CONTINENT
-origins_subset$name
-
-```
-
 ```{r}
 library(maps)
 map()
@@ -281,6 +268,71 @@ map(origins, add=TRUE, fill=TRUE, col=adjustcolor("cornflowerblue", alpha=1))
 # need to reproject
 ```
 This is obviously a bad projection fit right now. 
+
+##map for final figure
+
+
+
+```{r}
+origins <- readShapePoly('Origins_updated.shp')
+proj4string(origins) <- CRS("+proj=longlat +datum=WGS84")
+#proj <- CRS("+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs")
+#origins.ea <- spTransform(origins, proj)
+
+
+#subset_order <- c(1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 17, 18)
+subset_order <- c(8, 10, 9, 5, 18, 7, 6, 20, 1, 2, 13, 14)
+origins_subset <- origins[subset_order,]
+origins_subset$CONTINENT
+origins_subset$name
+
+
+```
+
+
+#### Make the map for the center panel (#5 on layout panel)
+
+```{r}
+d <- readPNG("earth.png")
+```
+
+![](earth.png)
+
+
+
+
+```{r}
+png(file=paste("40962.png",sep=""),width=2000,height=1000, bg="transparent")
+par(mar=c(0,0,0,0))
+plot(seq(-180, 180, length.out = 19), seq(-90, 90, length.out = 19), type="n",xlim=c(-180, 180),ylim=c(-90, 90), xaxt="n")
+
+rasterImage(d, -180, -90, 180, 90, interpolate=TRUE, col=d)
+
+polygon(x=c(-180,-180, 180,180), y=c(-90, 90, 90, -90), col=adjustcolor("white", alpha=0.1))
+#rasterImage(d, -13.5, -13.5, 375, 375, interpolate=TRUE, col=d)
+plot(origins_subset, add=TRUE, col=adjustcolor("white", alpha=.8), xaxt="n", border="white", lwd=4) #still need to reproject!!!
+LW <- 4
+lines(x = c(-100 , -130), y = c(20 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Mesoamerica
+lines(x = c(-80 , -70), y = c(0 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #NW_Lowland_SA
+lines(x = c(-74 , -5 ), y = c(5 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #N_Lowland_SA
+lines(x = c(40 , 30), y = c(36 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Fertile_Cresc
+lines(x = c(110 , 70), y = c(40 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Chinese_loess
+lines(x = c(142 , 160), y = c(-5 , 90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #New_Guinea
+lines(x = c(-85 , -130), y = c(33 , -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #E_North_Ameri
+lines(x = c(-68 , -75), y = c(-25 , -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #C/S_Andes
+lines(x = c(-10 , -20), y = c( 15, -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #W_African_Sav
+lines(x = c(25 , 40), y = c(9 , -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Sudanic_Savan
+lines(x = c(87 , 100), y = c(20 , -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Ganges_E_Indi
+lines(x = c(120 , 160), y = c(30 , -90), lty=2, col=adjustcolor("white", alpha=1), lwd=LW) #Lower-MiddleY
+
+
+
+dev.off()
+```
+
+![](40962.png)
+
+
 
 
 ##Import raster data
@@ -314,69 +366,145 @@ We should make our decisions very transparent here. We should be able to justify
 
 ```{r, cache=TRUE}
 # Read the polygons
+library(rgdal)
+getwd()
 origins <- readShapePoly('Origins_updated.shp')
+proj4string(origins) 
+
 ```
 
 
 ```{r}
 # Extract data
+library(raster)
+e <- extent(-180, 180, -60, 84)
+all_cells <- extract(r, e, cellnumber = TRUE)
+
 per.origin <- extract(r, origins, cellnumber = TRUE, buffer = 100000)
+
+length(all_cells)
+for(i in 1:20){
+all_cells <- all_cells[-which(per.origin[[i]][,1] %in% all_cells[,1]), ]
+}
+length(all_cells)
+
 names(per.origin) <- origins@data[, 1]
 
+str(all_cells)
 str(per.origin)
 ```
 
 ```{r}
-all_vectors <- rep(NA, 3)
+origin_vectors <- rep(NA, 3)
 
 for(h in 1:20){
 originI <- Pop[per.origin[[h]][, 1], ]
+cell_vector <-  as.vector(per.origin[[h]][, 1])
 x_values <- matrix(c(4:21), dim(originI)[1], 18, byrow=TRUE)
 x_value_vector <- as.vector(x_values)
 y_value_vector <- as.vector(originI)
-all_vectors_pre <- cbind(rep(names(per.origin)[h], length(x_value_vector)),x_value_vector, y_value_vector)
-all_vectors <- rbind(all_vectors, all_vectors_pre)
-}
-all_vectors <- as.data.frame(all_vectors)
-all_vectors <- cbind(all_vectors, scale(as.numeric(all_vectors[,3])))
-colnames(all_vectors) <- c("location_name", "x_values", "density_values", "scaled_density_values")
 
-all_vectors
+all_vectors_pre <- cbind(rep(names(per.origin)[h], length(x_value_vector)),x_value_vector, y_value_vector, cell_vector)
+origin_vectors <- rbind(origin_vectors, all_vectors_pre)
+}
+
+#names(origin_vectors)[1] <- "location"
+origin_vectors <- origin_vectors[-1,]
+origin_vectors
 ```
 
 ```{r}
 #not in origin
 
+All <- Pop[all_cells[, 1], ]
+cell_vector <-  as.vector(All[, 1])
+x_values <- matrix(c(4:21), dim(All)[1], 18, byrow=TRUE)
+x_value_vector <- as.vector(x_values)
+y_value_vector <- as.vector(All)
 
+all_vectors_pre <- cbind(rep("not_origin", length(x_value_vector)),x_value_vector, y_value_vector, cell_vector)
+all_vectors <- as.data.frame(rbind(origin_vectors, all_vectors_pre))
+levels(all_vectors[,1])
+```
+
+```{r}
+
+all_vectors <- cbind(all_vectors, scale(as.numeric(all_vectors[,3])))
+colnames(all_vectors) <- c("location_name", "x_values", "density_values", "cell_ID", "scaled_density_values")
+all_vectors <- all_vectors[, c(1,2,3,5,4)]
+all_vectors
 ```
 
 
 
+```{r, cache=TRUE}
 
-```{r}
 
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-for(h in 1:18){
+
+par(mfrow=c(4,6), mar=c(0,0,0,0), xaxt="n")
+for(h in 1:20){
 #h <- 3
-density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+density_trend <- origin_vectors[which(origin_vectors[,1] == names(per.origin)[h]),]
 
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
 
 points(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+mtext(as.character(density_trend[1,1]), 3, line=-1, cex=0.5)
 }
 
 #all origins
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
 
-points(as.numeric(all_vectors[,2]), as.numeric(all_vectors[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+points(as.numeric(origin_vectors[,2]), as.numeric(origin_vectors[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+mtext("all origins", 3, line=-1, cex=0.5)
 
+#not origins
+not_origins <- subset(all_vectors, location_name == "not_origin")
+plot(as.numeric(not_origins[,2]), as.numeric(not_origins[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
+
+points(as.numeric(not_origins[,2]), as.numeric(not_origins[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+mtext("all origins", 3, line=-1, cex=0.5)
 ```
 
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-for(h in 1:18){
+
+
+
+
+```{r, cache=TRUE}
+
+par(mfrow=c(4,6), mar=c(0,0,0,0), xaxt="n")
+for(h in 1:20){
 #h <- 3
-density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+density_trend <- all_vectors[which(all_vectors[,1] == names(per.origin)[h]),]
+
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+
+for(g in levels(as.factor(density_trend[,5]))){
+subbed <- subset(density_trend, cell_ID == g)
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(as.numeric(ordered_subbed[,2]), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("cornflowerblue", 0.8))
+}
+mtext(as.character(density_trend[1,1]), 3, line=-1, cex=0.5)
+}
+
+#all origins
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+
+for(g in levels(as.factor(density_trend[,5]))){
+subbed <- subset(density_trend, cell_ID == g)
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(as.numeric(ordered_subbed[,2]), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("cornflowerblue", 0.8))
+}
+mtext("all origins", 3, line=-1, cex=0.5)
+```
+
+
+
+```{r, cache=TRUE}
+par(mfrow=c(4,6), mar=c(0,0,0,0))
+for(h in 1:20){
+#h <- 3
+density_trend <- all_vectors[which(all_vectors[,1] == names(per.origin)[h]),]
 
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(4,21), type="n", xaxt="n", yaxt="n")
 
@@ -391,7 +519,7 @@ summary(gammer)
 
 
 lines(as.numeric(ordered_density_trend[,2]) ,predict(gammer),  col="cornflowerblue", lwd=2)
-
+mtext(as.character(ordered_density_trend[1,1]), 3, line=-1, cex=0.5)
 }
 
 density_trend <- all_vectors[-1,]
@@ -412,7 +540,7 @@ length(ordered_density_trend[,2])
 length(predict(gammer))
 
 lines(as.numeric(ordered_density_trend[,2]) ,predict(gammer),  col="cornflowerblue", lwd=2)
-
+mtext("all origins", 3, line=-1, cex=0.5)
 
 ```
 
@@ -421,18 +549,18 @@ the parameter α which controls the degree of smoothing.
 
 The size of the neighbourhood is controlled by α (set by span or enp.target). For α < 1, the neighbourhood includes proportion α of the points, and these have tricubic weighting (proportional to (1 - (dist/maxdist)^3)^3). For α > 1, all points are used, with the ‘maximum distance’ assumed to be α^(1/p) times the actual maximum distance for p explanatory variables.
 
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-for(h in 1:18){
+```{r, cache=TRUE}
+par(mfrow=c(4,6), mar=c(0,0,0,0))
+for(h in 1:20){
 #h <- 3
-density_trend <- all_vectors[which(all_vectors[,1] == levels(all_vectors[,1])[h]),]
+density_trend <- all_vectors[which(all_vectors[,1] == names(per.origin)[h]),]
 ordered_density_trend <- density_trend[order(density_trend$x_values), ]
 
 gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = .5)
 summary(gammer)
 predict_gam <- predict(gammer, se=TRUE)
 
-plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-3,3), xlim=c(0,21), type="n", xaxt="n", yaxt="n")
+plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(0,21), type="n", xaxt="n", yaxt="n")
 #axis(1, label= seq(4,21, by=1), at=rev(seq(1,18, by=1)))
 
 polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window), y=c(-2, 2, 2, -2), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
@@ -451,7 +579,10 @@ mtext(as.character(ordered_density_trend[1,1]), 3, line=-1, cex=0.5)
 
 ```
 
-```{r}
+
+
+
+```{r, cache=TRUE}
 par(mfrow=c(2,5), mar=c(0,0,0,0))
 for(j in seq(0.2, 2, by=.2)){
 
@@ -493,7 +624,8 @@ mtext(paste("span = ", j), 3, line=-3, cex=0.5)
 
 
 
-```{r}
+
+```{r, cache=TRUE}
 # need to add a global mean, an everything but the origins mean, and a buffer around the origins mean. 
 # Function standardization
 std <- function(x) {
@@ -521,6 +653,8 @@ for (j in 1:length(per.origin)) {
     model <- gam(b[, i] ~ s(time, df = h))
     col <- sample(rainbow(100), 1)
     predictions[i, ] <- predict(model)
+    #plot(b[, i] ~ time)
+    #lines(predictions[i, ] ~ time)
   }
   global.means[[j]] <- apply(predictions, 2, mean) 
   global.SD[[j]] <- apply(predictions, 2, sd)
@@ -615,7 +749,7 @@ axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
 
 
 
-```{r}
+```{r, cache=TRUE}
 par(mfrow=c(4,5), mar=c(0,0,0,0))
 
 for_3 <- diff_df(1)
@@ -640,7 +774,7 @@ mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
 ```
 GAM model using one degree of freedom
 
-```{r}
+```{r, cache=TRUE}
 par(mfrow=c(4,5), mar=c(0,0,0,0))
 
 for_3 <- diff_df(2)
@@ -663,7 +797,7 @@ mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
 ```
 GAM model using two degree of freedom
 
-```{r}
+```{r, cache=TRUE}
 par(mfrow=c(4,5), mar=c(0,0,0,0))
 
 for_3 <- diff_df(3)
@@ -685,102 +819,6 @@ mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
 }
 ```
 GAM model using three degree of freedom
-
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-
-for_3 <- diff_df(4)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-for(i in 1:20){
-plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
-
-polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
-
-polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
-lines(global.means[[i]])
-
-#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
-}
-```
-GAM model using four degree of freedom
-
-
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-
-for_3 <- diff_df(5)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-for(i in 1:20){
-plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
-
-polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
-
-polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
-lines(global.means[[i]])
-
-#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
-}
-```
-GAM model using 5 degree of freedom
-
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-
-for_3 <- diff_df(10)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-for(i in 1:20){
-plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
-
-polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))  
-  
-polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
-lines(global.means[[i]])
-
-#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
-}
-```
-GAM model using 10 degree of freedom
-
-
-
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-
-for_3 <- diff_df(12)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-for(i in 1:20){
-plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,22), xaxt="n", yaxt="n")
-
-polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))  
-  
-polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
-lines(global.means[[i]])
-
-#axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-mtext(names(global.means)[i], 3, line=-1, cex=.5, adj=.3)
-}
-```
-GAM model using 12 degree of freedom
-
 
 
 
@@ -873,11 +911,11 @@ layout.show(a)
 #### Make blank template plots
 ```{r}
 frameplot <- function(){
-	plot(21:0,rep(0, 22), xlim=c(17,4), ylim=c(0, 2.25), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
+	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(-3, 2.25), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
 }
 
 frameplot_bottom <- function(){
-	plot(21:0,rep(0, 22), xlim=c(17,4), ylim=c(-0.25, 2), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
+	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(-3.25, 2), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
 }
 ```
 
@@ -886,35 +924,6 @@ frameplot()
 frameplot_bottom()
 ```
 
-
-
-
-##map for final figure
-
-
-
-#### Make the map for the center panel (#5 on layout panel)
-
-```{r}
-d <- readPNG("earth.png")
-```
-
-![](earth.png)
-
-```{r}
-png(file=paste("40962.png",sep=""),width=2000,height=1000, bg="transparent")
-par(mar=c(0,0,0,0))
-plot(seq(-180, 180, length.out = 19), seq(-90, 90, length.out = 19), type="n",xlim=c(-180, 180),ylim=c(-90, 90), xaxt="n")
-
-rasterImage(d, -180, -90, 180, 90, interpolate=TRUE, col=d)
-
-polygon(x=c(-180,-180, 180,180), y=c(-90, 90, 90, -90), col=adjustcolor("white", alpha=0.1))
-#rasterImage(d, -13.5, -13.5, 375, 375, interpolate=TRUE, col=d)
-plot(origins_subset, add=TRUE, col=adjustcolor("white", alpha=.8), xaxt="n", border="white", lwd=4) #still need to reproject!!!
-dev.off()
-```
-
-![](40962.png)
 
 
 
@@ -927,11 +936,36 @@ dev.off()
 
 type_number <- 8
 
-complex_figure <- function(type_number, i, means, sds){
-						
-if(i < 6)	polygon(x=c(12,12,8.2,8.2), y=c(-1,3,3,-1), col=adjustcolor("cornflowerblue", alpha=0.4), border=NA)					
-if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-1,3,3,-1), col=adjustcolor("limegreen", alpha=0.4), border=NA)
-									
+complex_figure <- function(type_number, location_name, i, means, sds){
+		
+#polygon(x=c(-30,-30,30,30), y=c(-30,30,30,-30), col="black")  
+  
+abline(h=0, lty=2)			
+
+if(i < 6)	polygon(x=c(12,12,8.2,8.2), y=c(-3,3,3,-3), col=adjustcolor("cornflowerblue", alpha=0.2), border=NA)					
+if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-3,3,3,-3), col=adjustcolor("cornflowerblue", alpha=0.2), border=NA)
+			
+  
+  	match <- domestication_times[ which(domestication_times$Region == levels(domestication_times$Region)[ type_number]), 9]
+	maxer <- max(match, na.rm=TRUE)
+	break_one_1 <- maxer
+			break_two_1 <- maxer - quantile(j)[2]
+				
+#	polygon(x=c(break_two_1, break_two_1, break_one_1, break_one_1), y=c(0, 1, 1, 0), col=adjustcolor("cornflowerblue", alpha=0.5), border=NA)
+		lines(x=c(break_one_1, break_one_1), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=0.7), lwd=3)	
+
+  
+  
+  match <- domestication_times[ which(domestication_times$Region == levels(domestication_times$Region)[ type_number]), 10]
+	maxer <- max(match, na.rm=TRUE)
+	break_one_2 <- maxer
+			break_two_2 <- maxer - quantile(j)[2]
+				
+#	polygon(x=c(break_two_2, break_two_2, break_one_2, break_one_2), y=c(1, 2, 2, 1), col=adjustcolor("limegreen", alpha=0.5), border=NA)
+		lines(x=c(break_one_2, break_one_2), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=1), lwd=3)	
+	
+		
+  						
 	match <- domestication_times[ which(domestication_times$Region == levels(domestication_times$Region)[ type_number]), 9]
 	maxer <- max(match, na.rm=TRUE)
 	j <- ecdf(maxer-match)
@@ -939,18 +973,13 @@ if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-1,3,3,-1), col=adjustcolor("limegre
 	
 
 x_seq <- rev(c(0,seq(0, maxer, length.out=100)))
-y_seq <- -c(0, j(seq(0, maxer, length.out=100)))
+y_seq <- c(0, j(seq(0, maxer, length.out=100))) 
 
 #lines(x_seq, y_seq, type="l", ylim=c(-1,1))
-#polygon(c(0, x_seq), c(0, y_seq), border="black", col=adjustcolor("cornflowerblue", alpha=0.5))
+polygon(c(0, x_seq), c(0, y_seq) -3, border=NA, col=adjustcolor("white", alpha=1), lwd=.5)
+polygon(c(0, x_seq), c(0, y_seq) -3, border="cornflowerblue", col=adjustcolor("cornflowerblue", alpha=.5), lwd=.5)
 #abline(v= maxer - quantile(j)[2])
 
-	
-	break_one_1 <- maxer
-			break_two_1 <- maxer - quantile(j)[2]
-				
-#	polygon(x=c(break_two_1, break_two_1, break_one_1, break_one_1), y=c(0, 1, 1, 0), col=adjustcolor("cornflowerblue", alpha=0.5), border=NA)
-			
 
 	match <- domestication_times[ which(domestication_times$Region == levels(domestication_times$Region)[ type_number]), 10]
 	maxer <- max(match, na.rm=TRUE)
@@ -959,24 +988,24 @@ y_seq <- -c(0, j(seq(0, maxer, length.out=100)))
 	
 
 x_seq <- rev(c(0,seq(0, maxer, length.out=100)))
-y_seq <- 2+c(0, j(seq(0, maxer, length.out=100)))
+y_seq <- c(0, j(seq(0, maxer, length.out=100))) 
 
 #lines(x_seq, y_seq)
-#polygon(c(0, x_seq), c(2, y_seq), border="black", col=adjustcolor("limegreen", alpha=0.5))
+polygon(c(0, x_seq), c(0, y_seq) -3, border="white", col=adjustcolor("white", alpha=1), lwd=.5)
+polygon(c(0, x_seq), c(0, y_seq) -3, border="white", col=adjustcolor("cornflowerblue", alpha=1), lwd=.5)
+
 
 	
-	break_one_2 <- maxer
-			break_two_2 <- maxer - quantile(j)[2]
-				
-#	polygon(x=c(break_two_2, break_two_2, break_one_2, break_one_2), y=c(1, 2, 2, 1), col=adjustcolor("limegreen", alpha=0.5), border=NA)
-			
-	
+		
+
+		
+		
 		#abline(v=11)
-	type <- 1
+	type <- 3
 		
 		if(type == 1){
 	x <- c(means[[i]] , means[[i]]  + abs(sds[[i]]), means[[i]]  - abs(sds[[i]]))
-	scaled <- scale(x , center=FALSE)
+	scaled <- scale(x , center=TRUE)
 	meanss <- scaled[1:18]
 	sdss_plus <- scaled[19:36]
 	sdss_minus <- scaled[37:54]
@@ -988,44 +1017,91 @@ y_seq <- 2+c(0, j(seq(0, maxer, length.out=100)))
 	}
 	
 	if(type == 2){
-	x <- c(means[[i]] , means[[i]]  + abs(sds[[i]]), means[[i]]  - abs(sds[[i]]))
-	scaled <- x + 1 #scale(x , center=FALSE)
-	meanss <- scaled[1:18]
-	sdss_plus <- scaled[19:36]
-	sdss_minus <- scaled[37:54]
-	#abline(v=10, col="red")
-	length(scaled)
-	#lines(4:21, means[[i]] + sds[[i]])
-	polygon(x=c(4:21, 21:4), y=c(sdss_plus, rev(sdss_minus)), col=adjustcolor("firebrick", alpha=1), border="white")	
+#h <- 3
+density_trend <- all_vectors[which(all_vectors[,1] == location_name ),]
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+
+for(g in levels(as.factor(density_trend[,5]))){
+subbed <- subset(density_trend, cell_ID == g)
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(22-as.numeric(ordered_subbed[,2]), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+density_trend <- all_vectors[which(all_vectors[,1] == location_name),]
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+#gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = 1)
+gammer <- gam(as.numeric(ordered_density_trend[,4]) ~ s(as.numeric(ordered_density_trend[,2]), df = 3))
+
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+polygon(x=3+c(rev(ordered_density_trend[,2]), ordered_density_trend[,2] ), y=c(predict_gam$fit, rev(predict_gam$fit)), col=adjustcolor("firebrick", alpha=.5),bty="n", lwd=.2)
+lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+
 	}
 
 if(type == 3){
-	x <- c(means[[i]] , means[[i]]  + abs(sds[[i]]), means[[i]]  - abs(sds[[i]]))
-	scaled <- x #scale(x , center=FALSE)
-	meanss <- scaled[1:18]
-	sdss_plus <- scaled[19:36]
-	sdss_minus <- scaled[37:54]
-	#abline(v=10, col="red")
-	length(scaled)
-	#lines(4:21, means[[i]] + sds[[i]])
-	polygon(x=c(4:21, 21:4), y=c(sdss_plus, rev(sdss_minus)), col=adjustcolor("firebrick", alpha=1), border="white")	
+	
+#h <- 3
+density_trend <- all_vectors[which(all_vectors[,1] == location_name ),]
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+
+for(g in levels(as.factor(density_trend[,5]))){
+subbed <- subset(density_trend, cell_ID == g)
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(as.numeric(ordered_subbed[,2])), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+density_trend <- all_vectors[which(all_vectors[,1] == location_name),]
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = 1)
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+polygon(x=3+c(rev(ordered_density_trend[,2]), ordered_density_trend[,2] ), y=c(predict_gam$fit, rev(predict_gam$fit)), col=adjustcolor("firebrick", alpha=.5),bty="n", lwd=.2)
+lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+
+
 	}
 
 	
 	
-means_long_y <- c(1,1,1,1,1, meanss)
-means_long_x <- c(0:4, 4:21)
+#means_long_y <- c(1,1,1,1,1, meanss)
+#means_long_x <- c(0:4, 4:21)
  
-			break_one <- break_one_2
-			break_two <- break_two_2
+		#	break_one <- break_one_2
+		#	break_two <- break_two_2
 		#		polygon(x=c(break_one, break_one, 22, 22), y=c(1, 2, 2, 1), col=adjustcolor("white", alpha=0.8), border=NA)
 		#		polygon(x=c(break_two, break_two, break_one, break_one), y=c(1, 2, 2, 1), col=adjustcolor("white", alpha=0), border=NA)
 			#	polygon(x=c(-1,-1, break_two , break_two), y=c(1.9, 3.1, 3.1, 1.9), col=adjustcolor("white", alpha=0.8), border=NA)	
 				#abline(v= break_one, col="white")
 				#abline(v= break_two, col="white")
 				
-				break_one <- break_one_1
-			break_two <- break_two_1
+			#	break_one <- break_one_1
+		#	break_two <- break_two_1
 		#		polygon(x=c(break_one, break_one, 22, 22), y=c(0, 1, 1, 0), col=adjustcolor("white", alpha=0.8), border=NA)
 		#		polygon(x=c(break_two, break_two, break_one, break_one), y=c(0, 1, 1, 0), col=adjustcolor("white", alpha=0), border=NA)
 			#	polygon(x=c(-1,-1, break_two , break_two), y=c(-1.1, .1, .1, -1.1), col=adjustcolor("white", alpha=0.8), border=NA)	
@@ -1037,7 +1113,7 @@ means_long_x <- c(0:4, 4:21)
 #lines(x=c(break_two_2, break_two_2), y=c(1,3), col="white")
 #lines(x=c(break_two_1, break_two_1), y=c(1,-1), col="white") 
 #lines(4:21, meanss)
-	lines(21:4, meanss)
+	#lines(21:4, meanss)
 	
 }
 
@@ -1046,7 +1122,8 @@ means_long_x <- c(0:4, 4:21)
 
 ```{r}
 frameplot()
-complex_figure(7, 1, global.means, global.SD) 
+complex_figure(1,names(per.origin)[2], 1, global.means, global.SD) 
+
 axis(1)
 axis(2)
 ```
@@ -1063,7 +1140,7 @@ layout(matrix(c(
 	3,	5, 5, 5, 5, 5, 5, 	4, 
 	3, 	12, 13, 14, 15, 16, 17,	4,
 	2, 2, 2, 2, 2, 2, 2, 2
-	), 5, 8, byrow=TRUE), width=c(1, 1, 1, 1, 1, 1, 1, 1), height=c(0.5, 1, 1.5, 1, 0.5))
+	), 5, 8, byrow=TRUE), width=c(1, 1, 1, 1, 1, 1, 1, 1), height=c(0.7, 1, 1.5, 1, 0.7))
 
 
 par(mar=c(0,0,0,0))
@@ -1083,30 +1160,7 @@ blankplot()
 
 
 
-origins <- readShapePoly('Origins_updated.shp')
 
-origin.time.region <- c(2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 
-                        2, 2, 1, 2, 2, 2, 2, 2, 2, 2) # 1 = early; 2 = middle
-as.character(origins$CONTINENT)
-
-#subset_order <- c(1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 17, 18)
-subset_order <- c(8, 10, 9, 5, 18, 7, 6, 20, 1, 2, 13, 16)
-origins_subset <- origins[subset_order,]
-origins_subset$CONTINENT
-
-
-
-d <- readPNG("earth.png")
-png(file=paste("40962.png",sep=""),width=2000,height=1000, bg="transparent")
-par(mar=c(0,0,0,0))
-plot(seq(-180, 180, length.out = 19), seq(-90, 90, length.out = 19), type="n",xlim=c(-180, 180),ylim=c(-90, 90), xaxt="n")
-
-rasterImage(d, -180, -90, 180, 90, interpolate=TRUE, col=d)
-
-polygon(x=c(-180,-180, 180,180), y=c(-90, 90, 90, -90), col=adjustcolor("white", alpha=0.1))
-#rasterImage(d, -13.5, -13.5, 375, 375, interpolate=TRUE, col=d)
-plot(origins_subset, add=TRUE, col=adjustcolor("white", alpha=.8), xaxt="n", border="white", lwd=4) #still need to reproject!!!
-dev.off()
 
 d <- readPNG("40962.png")
 dim(d)
@@ -1130,6 +1184,10 @@ means <- lapply(prod.origin, colMeans, na.rm = TRUE)
 sds <- lapply(prod.origin, colSds, na.rm = TRUE)
 
 ## new values from Bruno's GAM model (produced in script called Population_Trend_per_y.R)
+for_3 <- diff_df(3)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
 means <- global.means
 sds <- global.gams
 
@@ -1156,7 +1214,7 @@ for(i in 1:12){
 		## customize polygons for each graph
 	if(i == 1){ #mesoamerica  #values from Larson
 		
-			complex_figure(3, i, means, sds)
+			complex_figure(3, "Mesoamerica", i, means, sds)
 				
 	
 		}
@@ -1165,7 +1223,7 @@ for(i in 1:12){
 	#########
 	if(i == 2 ){ #NW lowlands SA  #values from Larson
 		
-		complex_figure(6, i, means, sds)
+		complex_figure(6, "NW_Lowland_SA", i, means, sds)
 	
 
 		}
@@ -1173,7 +1231,7 @@ for(i in 1:12){
 		#########
 	if( i == 3){ #NW lowlands SA  #values from Larson
 		
-		complex_figure(6, i, means, sds)
+		complex_figure(6, "N_Lowland_SA", i, means, sds)
 		
 		}
 
@@ -1182,14 +1240,14 @@ for(i in 1:12){
 	if(i == 4){ #Fertile crescent aka Southwest asia  #values from Larson
 		
 		
-	complex_figure(8, i, means, sds)
+	complex_figure(8, "Fertile_Cresc", i, means, sds)
 				
 		}
 		
 		#########
 	if(i == 5){ #loess plateau  #values from Larson
 		
-		complex_figure(2, i, means, sds)
+		complex_figure(2, "Chinese_loess", i, means, sds)
 			
 		}
 		
@@ -1197,7 +1255,7 @@ for(i in 1:12){
 		#########
 	if(i == 6){ #new guinea  #values from Larson
 		
-		complex_figure(4, i, means, sds)
+		complex_figure(4, "New_Guinea", i, means, sds)
 		
 		}
 
@@ -1205,7 +1263,7 @@ for(i in 1:12){
 #########
 	if(i == 7){ #Eastern N.A.  #values from Larson
 		
-		complex_figure(5, i, means, sds)
+		complex_figure(5, "E_North_Ameri", i, means, sds)
 		
 			}
 
@@ -1213,7 +1271,7 @@ for(i in 1:12){
 		#########
 	if(i == 8){ #Andes  #values from Larson
 		
-		complex_figure(6, i, means, sds)
+		complex_figure(6, "C/S_Andes", i, means, sds)
 		
 				}
 
@@ -1221,7 +1279,7 @@ for(i in 1:12){
 #########
 	if(i == 9){ #W. African Sav  #values from Larson
 		
-		complex_figure(1, i, means, sds)
+		complex_figure(1, "W_African_Sav", i, means, sds)
 		
 			}
 
@@ -1229,7 +1287,7 @@ for(i in 1:12){
 #########
 	if(i == 10){ #Sudanic sav  #values from Larson
 		
-		complex_figure(1, i, means, sds)
+		complex_figure(1, "Sudanic_Savan", i, means, sds)
 		
 				}
 
@@ -1238,15 +1296,15 @@ for(i in 1:12){
 	if(i == 11){ #Ganges  #values from Larson
 		
 		
-		complex_figure(7, i, means, sds) 
+		complex_figure(7, "Ganges_E_Indi", i, means, sds) 
 		
 		}
 
 
 #########
-	if(i == 12){ #loess  #values from Larson
+	if(i == 12){ #"Lower-MiddleY"  #values from Larson
 		
-		complex_figure(2, i, means, sds)
+		complex_figure(2, "Lower-MiddleY", i, means, sds)
 		 
 		 		}
 
@@ -1254,11 +1312,11 @@ for(i in 1:12){
 		
 		#lines(4:21, means[[i]])
 		
-		abline(h = 1, col=adjustcolor("forestgreen", alpha=.5), lty=2)
+		#abline(h = 1, col=adjustcolor("forestgreen", alpha=.5), lty=2)
 		
 	# add axes to some locations
-	if(i == 1 | i == 7){axis(2, at=seq(0,2, by=0.25), label=seq(0,2, by=0.25), las=1)}
-	if(i == 6 | i == 12){axis(4, at=seq(0,2, by=0.25), label=seq(0,2, by=0.25), las=1)}
+	if(i == 1 | i == 7){axis(2, at=seq(-2,2, by=0.5), label=seq(-2,2, by=0.5), las=1)}
+	if(i == 6 | i == 12){axis(4, at=seq(-2,2, by=0.5), label=seq(-2,2, by=0.5), las=1)}
 	#if(i == 6 | i == 12){axis(4, at=seq(2,3, by=0.25), label=seq(0,1, by=0.25), las=1)
 	#	axis(4, at=seq(-1,0, by=0.25), label=rev(seq(0,1, by=0.25)), las=1)
 	#	}
@@ -1266,11 +1324,11 @@ for(i in 1:12){
 
 	
 	# add text 
-	if(i < 7){polygon(x=c(-30, -30, 30, 30), y=c(-0.1, -0.5, -0.5, -0.1), col="black")
-	mtext(name_vector[i], 1, line=-1.2, col="white", cex=0.5)}
+	if(i < 7){polygon(x=c(-30, -30, 30, 30), y=c(-3.1, -3.5, -3.5, -3.1), col="black")
+	mtext(name_vector[i], 1, line=-0.9, col="white", cex=0.5)}
 	
 	if(i > 6){polygon(x=c(-30, -30, 30, 30), y=c(2.1, 2.5, 2.5, 2.1), col="black")
-	mtext(name_vector[i], 3, line=-1.2, col="white", cex=0.5)}
+	mtext(name_vector[i], 3, line=-0.8, col="white", cex=0.5)}
 	
 	# add axis labels
 	if(i == 1 | i ==  7){mtext("scaled density potential", 2, line=4, at=1)}
