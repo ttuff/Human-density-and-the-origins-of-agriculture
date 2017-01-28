@@ -1,9 +1,10 @@
 ---
-title: "Origins of agriculture density analysis"
-author: "Ty Tuff"
+title: "Origins of agriculture human density analysis"
+author: "Ty Tuff, Bruno Vilela, and Carlos Botero"
 date: 'project began: September 2016, document updated: `r strftime(Sys.time(), format
   = "%d %B %Y")`'
 output:
+  pdf_document: default
   html_notebook: default
   word_document: default
 ---
@@ -18,12 +19,12 @@ output:
 1. [R environment setup](#r-environment-setup)
 2. [Setting time breaks](#setting-time-breaks)
 3. [Defining origins](#defining-origins)
-4. [Import raster data](#import-raster-data)
-5. [GAM smoothing models](#gam-smoothing-models)
-6. [Compare rates between origins and not-origins](#compare-rates-between-origins-and-not-origins)
-7. [Compare rates between different time periods](#compare-rates-between-different-time-periods)
-8. [Setup final figure](#setup-final-figure)
-9. [Map for final figure](#map-for-final-figure)
+4. [Map for final figure](#map-for-final-figure)
+5. [Import raster data](#import-raster-data)
+6. [GAM vs. Loess smoothing models](#gam-vs-loess-smoothing-models)
+7. [Compare rates between origins and not-origins](#compare-rates-between-origins-and-not-origins)
+8. [Compare rates between different time periods](#compare-rates-between-different-time-periods)
+9. [Setup final figure](#setup-final-figure)
 10. [Trend through time panel for final figure](#trend-through-time-panel)
 11. [Assemble and print final figure](#assemble-the-figure)
 
@@ -36,9 +37,10 @@ library(png)
 library(maptools)
 library(raster)
 library(gam)
-
+library(maps)
 library(mapproj)
 library(rgl)
+library(knitr) 
 ```
 
 
@@ -84,7 +86,7 @@ dim(domestication_times)
 ```
 
 ```{r, echo=FALSE}
-library(knitr) 
+
 kable(domestication_times, caption= "This is our world")
 ```
 
@@ -250,28 +252,6 @@ There is a choice of two methods here. At the end of this section we need to pri
 ## Defining origins
 ![](Larson_origins.jpg)
 
-```{r}
-library(maps)
-map()
-map(origins, add=TRUE, fill=TRUE, col=adjustcolor("cornflowerblue", alpha=1))
-
-```
-
-
-```{r}
-map()
-d <- readPNG("Larson_origins.png")
-rasterImage(d, -180, -90, 180, 110, interpolate=TRUE, col=d)
-map(add=TRUE)
-map(origins, add=TRUE, fill=TRUE, col=adjustcolor("cornflowerblue", alpha=1))
-
-# need to reproject
-```
-This is obviously a bad projection fit right now. 
-
-##map for final figure
-
-
 
 ```{r}
 origins <- readShapePoly('Origins_updated.shp')
@@ -289,6 +269,20 @@ origins_subset$name
 
 ```
 
+```{r}
+
+map()
+map(origins, add=TRUE, fill=TRUE, col=adjustcolor("cornflowerblue", alpha=1))
+
+```
+
+ 
+
+##map for final figure
+
+
+
+
 
 #### Make the map for the center panel (#5 on layout panel)
 
@@ -302,13 +296,14 @@ d <- readPNG("earth.png")
 
 
 ```{r}
-png(file=paste("40962.png",sep=""),width=2000,height=1000, bg="transparent")
-par(mar=c(0,0,0,0))
+png(file=paste("40961.png",sep=""),width=1440,height=720, bg="transparent")
+par(mar=c(0,0,0,0), mai=c(0,0,0,0))
 plot(seq(-180, 180, length.out = 19), seq(-90, 90, length.out = 19), type="n",xlim=c(-180, 180),ylim=c(-90, 90), xaxt="n")
+x_adj <- 0
+y_adj <- 0
+rasterImage(d, -180 - x_adj, -90 - y_adj, 180 + x_adj, 90 + y_adj, interpolate=TRUE, col=d)
 
-rasterImage(d, -180, -90, 180, 90, interpolate=TRUE, col=d)
-
-polygon(x=c(-180,-180, 180,180), y=c(-90, 90, 90, -90), col=adjustcolor("white", alpha=0.1))
+#polygon(x=c(-180,-180, 180,180), y=c(-90, 90, 90, -90), col=adjustcolor("white", alpha=0.1))
 #rasterImage(d, -13.5, -13.5, 375, 375, interpolate=TRUE, col=d)
 plot(origins_subset, add=TRUE, col=adjustcolor("white", alpha=.8), xaxt="n", border="white", lwd=4) #still need to reproject!!!
 LW <- 4
@@ -330,12 +325,29 @@ lines(x = c(120 , 160), y = c(30 , -90), lty=2, col=adjustcolor("white", alpha=1
 dev.off()
 ```
 
+```{r}
+#need to overplot so it fills the whole frame. the default plot leaves a border around the photo
+d <- readPNG("40961.png")
+png(file=paste("40962.png",sep=""),width=1440,height=720, bg="transparent")
+par(mar=c(0,0,0,0), mai=c(0,0,0,0))
+plot(seq(-180, 180, length.out = 19), seq(-90, 90, length.out = 19), type="n",xlim=c(-180, 180),ylim=c(-90, 90), xaxt="n")
+x_adj <- 30
+y_adj <- 15
+rasterImage(d, -180 - x_adj, -90 - y_adj, 180 + x_adj, 90 + y_adj, interpolate=TRUE, col=d)
+
+dev.off()
+```
+
+
+
+
 ![](40962.png)
 
 
 
+##Import raster data 
 
-##Import raster data
+unit = potential human density and projected productivity
 ```{r}
 #subset and reorder origins. This is currently done at the end of the plot but should be moved forward.
 
@@ -354,9 +366,87 @@ r
 
 
 
-## GAM smoothing models
-#### Justification for General Adative Models.
-  We need to justify our decision to use a GAM over other models. This should include citations to back up those arguments. 
+##GAM vs Loess smoothing models
+### Justification for smoothing Models.
+  We need to justify our decision to use a GAM over other models. This should include citations to back up those arguments.
+  
+  This is a data fitting model, not a theory driven model. There is no process or mechanism built into the model, the model is just flexably fitting the data. There are many ways of doing this, but here we're competing the GAM and Loess against eachother to tell us a better story. The models are very similar, but slightly different. The Loess model is a local averaging model where the flexible parameter is how many of the surrounding points to take into consideration, and the GAM is a global averaging model where the flexible parameter is the number of bends in the line and then those bends are fit in the best way possible. The advantage of GAM is that it produces a translatable model that could be fit to different datasets. The disadvantage of GAM is that it often produces poor data fits. The Loess model moves along the x-axes and averages along the way. The advantage of a loess is that it tends to track the data nicely with few parameters, but it doesn't produce a transportable model for comparing against other datasets. 
+  
+#### about LOESS from the internet: http://www.itl.nist.gov/div898/handbook/pmd/section1/pmd144.htm
+
+"LOESS, originally proposed by Cleveland (1979) and further developed by Cleveland and Devlin (1988), specifically denotes a method that is (somewhat) more descriptively known as locally weighted polynomial regression. At each point in the data set a low-degree polynomial is fit to a subset of the data, with explanatory variable values near the point whose response is being estimated. The polynomial is fit using weighted least squares, giving more weight to points near the point whose response is being estimated and less weight to points further away. The value of the regression function for the point is then obtained by evaluating the local polynomial using the explanatory variable values for that data point. The LOESS fit is complete after regression function values have been computed for each of the n data points. Many of the details of this method, such as the degree of the polynomial model and the weights, are flexible. 
+  The local polynomials fit to each subset of the data are almost always of first or second degree; that is, either locally linear (in the straight line sense) or locally quadratic. Using a zero degree polynomial turns LOESS into a weighted moving average. Such a simple local model might work well for some situations, but may not always approximate the underlying function well enough. Higher-degree polynomials would work in theory, but yield models that are not really in the spirit of LOESS. LOESS is based on the ideas that any function can be well approximated in a small neighborhood by a low-order polynomial and that simple models can be fit to data easily. High-degree polynomials would tend to overfit the data in each subset and are numerically unstable, making accurate computations difficult.
+  The biggest advantage LOESS has over many other methods is the fact that it does not require the specification of a function to fit a model to all of the data in the sample. Instead the analyst only has to provide a smoothing parameter value and the degree of the local polynomial. In addition, LOESS is very flexible, making it ideal for modeling complex processes for which no theoretical models exist. These two advantages, combined with the simplicity of the method, make LOESS one of the most attractive of the modern regression methods for applications that fit the general framework of least squares regression but which have a complex deterministic structure.
+  Although LOESS does share many of the best features of other least squares methods, efficient use of data is one advantage that LOESS doesn't share. LOESS requires fairly large, densely sampled data sets in order to produce good models. This is not really surprising, however, since LOESS needs good empirical information on the local structure of the process in order perform the local fitting. In fact, given the results it provides, LOESS could arguably be more efficient overall than other methods like nonlinear least squares. It may simply frontload the costs of an experiment in data collection but then reduce analysis costs.
+Another disadvantage of LOESS is the fact that it does not produce a regression function that is easily represented by a mathematical formula. This can make it difficult to transfer the results of an analysis to other people. In order to transfer the regression function to another person, they would need the data set and software for LOESS calculations. In nonlinear regression, on the other hand, it is only necessary to write down a functional form in order to provide estimates of the unknown parameters and the estimated uncertainty. Depending on the application, this could be either a major or a minor drawback to using LOESS.
+Finally, as discussed above, LOESS is a computational intensive method. This is not usually a problem in our current computing environment, however, unless the data sets being used are very large. LOESS is also prone to the effects of outliers in the data set, like other least squares methods. There is an iterative, robust version of LOESS [Cleveland (1979)] that can be used to reduce LOESS' sensitivity to outliers, but extreme outliers can still overcome even the robust method.
+	$q$ is called the smoothing parameter because it controls the flexibility of the LOESS regression function. Large values of q produce the smoothest functions that wiggle the least in response to fluctuations in the data. The smaller $q$ is, the closer the regression function will conform to the data. Using too small a value of the smoothing parameter is not desirable, however, since the regression function will eventually start to capture the random error in the data. Useful values of the smoothing parameter typically lie in the range $0.25$ to $0.5$ for most LOESS applications."
+  
+#### about GAM from the internet: http://multithreaded.stitchfix.com/blog/2015/07/30/gam/
+  
+  "Imagine that you step into a room of data scientists; the dress code is casual and the scent of strong coffee is hanging in the air. You ask the data scientists if they regularly use generalized additive models (GAM) to do their work. Very few will say yes, if any at all.
+
+Now let’s replay the scenario, only this time we replace GAM with, say, random forest or support vector machines (SVM). Everyone will say yes, and you might even spark a passionate debate.
+
+Despite its lack of popularity in the data science community, GAM is a powerful and yet simple technique. Hence, the purpose of this post is to convince more data scientists to use GAM. Of course, GAM is no silver bullet, but it is a technique you should add to your arsenal. Here are three key reasons:
+
+Easy to interpret.
+
+Flexible predictor functions can uncover hidden patterns in the data.
+
+Regularization of predictor functions helps avoid overfitting.
+
+  In general, GAM has the interpretability advantages of GLMs where the contribution of each independent variable to the prediction is clearly encoded. However, it has substantially more flexibility because the relationships between independent and dependent variable are not assumed to be linear. In fact, we don’t have to know a priori what type of predictive functions we will eventually need. From an estimation standpoint, the use of regularized, nonparametric functions avoids the pitfalls of dealing with higher order polynomial terms in linear models. From an accuracy standpoint, GAMs are competitive with popular learning techniques.
+
+Generalized additive models were originally invented by Trevor Hastie and Robert Tibshirani in 1986 (see [1], [2]). The GAM framework is based on an appealing and simple mental model:
+
+    Relationships between the individual predictors and the dependent variable follow smooth patterns that can be linear or nonlinear.
+
+    We can estimate these smooth relationships simultaneously and then predict $$g(E(Y)))$$
+ by simply adding them up.
+
+Mathematically speaking, GAM is an additive modeling technique where the impact of the predictive variables is captured through smooth functions which—depending on the underlying patterns in the data—can be nonlinear.
+
+References
+
+[1] Hastie, Trevor and Tibshirani, Robert. (1990), Generalized Additive Models, New York: Chapman and Hall.
+
+[2] Hastie, Trevor and Tibshirani, Robert. (1986), Generalized Additive Models, Statistical Science, Vol. 1, No 3, 297-318.
+
+[3] Wood, S. N. (2006), Generalized Additive Models: an introduction with R, Boca Raton: Chapman & Hall/CRC
+
+[4] Wood, S. N. (2004). Stable and efficient multiple smoothing parameter estimation for generalized additive models. Journal of the American Statistical Association 99, 673–686
+
+[5] Marx, Brian D and Eilers, Paul H.C. (1998). Direct generalized additive modeling with penalized likelihood, Computational Statistics & Data Analysis 28 (1998) 193-20
+
+[6] Sinha, Samiran, A very short note on B-splines, http://www.stat.tamu.edu/~sinha/research/note1.[PDF](/assets/files/gam.pdf)
+
+[7] German Rodrıguez (2001), Smoothing and Non-Parametric Regression, http://data.princeton.edu/eco572/smoothing.pd
+
+[8] Notes on GAM By Simon Wood. http://people.bath.ac.uk/sw283/mgcv/tampere/gam.[PDF](/assets/files/gam.pdf)
+
+[9] Notes on Smoothing Parameter Selection By Simon Wood, http://people.bath.ac.uk/sw283/mgcv/tampere/smoothness.[PDF](/assets/files/gam.pdf)
+
+[10] Notes on REML & GAM By Simon Wood, http://people.bath.ac.uk/sw283/talks/REML.[PDF](/assets/files/gam.pdf)
+
+[11] Karatzoglou, Alexandros, Meyer, David and Hornik, Kurt (2006), Support Vector Machines in R, Journal of Statistical Software Volume 15, Issue 9, http://www.jstatsoft.org/v15/i09/paper
+
+[12] “e1071” package, https://cran.r-project.org/web/packages/e1071/e1071.[PDF](/assets/files/gam.pdf)
+
+[13] “mgcv” package, https://cran.r-project.org/web/packages/mgcv/mgcv.[PDF](/assets/files/gam.pdf)
+
+[14] “gam” package, https://cran.r-project.org/web/packages/gam/gam.[PDF](/assets/files/gam.pdf)
+
+[15] “randomForestSRC” package, https://cran.r-project.org/web/packages/randomForestSRC/randomForestSRC.[PDF](/assets/files/gam.pdf)
+
+or from: http://plantecology.syr.edu/fridley/bio793/gam.html
+
+GAMs in R are a nonparametric extension of GLMs, used often for the case when you have no a priori reason for choosing a particular response function (such as linear, quadratic, etc.) and want the data to 'speak for themselves'.  GAMs do this via a smoothing function, similar to what you may already know about locally weighted regressions.  GAMs take each predictor variable in the model and separate it into sections (delimited by 'knots'), and then fit polynomial functions to each section separately, with the constraint that there are no kinks at the knots (second derivatives of the separate functions are equal at the knots).  The number of parameters used for such fitting is obviously more than what would be necessary for a simpler parametric fit to the same data, but computational shortcuts mean the model degrees of freedom is usually lower than what you might expect from a line with so much 'wiggliness'.  Indeed this is the principal statistical issue associated with GAM modeling: minimizing residual deviance (goodness of fit) while maximizing parsimony (lowest possible degrees of freedom).  Since the model fit is based on deviance/likelihood, fitted models are directly comparable with GLMs using likelihood techniques (like AIC) or classical tests based on model deviance (Chi-squared or F tests, depending on the error structure).  Even better, all the error and link structures of GLMs are available in GAMs (including poisson and binomial), as are the standard suite of lm or glm attributes (resid, fitted, summary, coef, etc.).  A principal reason why GAMs are often less preferred than GLMs is that the results are often difficult to interpret because no parameter values are returned (although significance tests of each term are).  They can be very good for prediction/interpolation, as well as exploratory analyses about the functional nature of a response.  Some researchers examine the shape of a curve with GAMs, then reconstruct the curve shape parametrically with GLMs for model building.
+            There are two common implementations of GAMs in R.  The older version (originally made for S-PLUS) is available as the 'gam' package by Hastie and Tibshirani.  The newer version that we will use below is the 'mgcv' package from Simon Wood.  The basic modeling procedure for both packages is similar (the function is gam for both; be wary of having both libraries loaded at the same time), but the behind-the-scenes computational approaches differ, as do the arguments for optimization and the model output.  Expect the results to be slightly different when used with the same model structure on the same dataset."
+  
+  
+  
+  These are the most uninformed models you can use. We can certainly try to add some process to these models and try to get some more reliable numbers, but this will involve more work. 
 
 
 ### Fit and plot GAM model with different degrees of freedom
@@ -410,7 +500,7 @@ origin_vectors <- rbind(origin_vectors, all_vectors_pre)
 
 #names(origin_vectors)[1] <- "location"
 origin_vectors <- origin_vectors[-1,]
-origin_vectors
+head(origin_vectors)
 ```
 
 ```{r}
@@ -432,19 +522,19 @@ levels(all_vectors[,1])
 all_vectors <- cbind(all_vectors, scale(as.numeric(all_vectors[,3])))
 colnames(all_vectors) <- c("location_name", "x_values", "density_values", "cell_ID", "scaled_density_values")
 all_vectors <- all_vectors[, c(1,2,3,5,4)]
-all_vectors
+dim(all_vectors)
 ```
 
 
 
 ```{r, cache=TRUE}
 
-
+origins <- subset(all_vectors, location_name != "not_origin")
 
 par(mfrow=c(4,6), mar=c(0,0,0,0), xaxt="n")
 for(h in 1:20){
 #h <- 3
-density_trend <- origin_vectors[which(origin_vectors[,1] == names(per.origin)[h]),]
+density_trend <- origins[which(origins[,1] == names(per.origin)[h]),]
 
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
 
@@ -455,7 +545,7 @@ mtext(as.character(density_trend[1,1]), 3, line=-1, cex=0.5)
 #all origins
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
 
-points(as.numeric(origin_vectors[,2]), as.numeric(origin_vectors[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
+points(as.numeric(origins[,2]), as.numeric(origins[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
 mtext("all origins", 3, line=-1, cex=0.5)
 
 #not origins
@@ -463,9 +553,8 @@ not_origins <- subset(all_vectors, location_name == "not_origin")
 plot(as.numeric(not_origins[,2]), as.numeric(not_origins[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-5,5), xlim=c(4,21), type="n")
 
 points(as.numeric(not_origins[,2]), as.numeric(not_origins[,4]), cex=0.5, col=adjustcolor("cornflowerblue", 0.5))
-mtext("all origins", 3, line=-1, cex=0.5)
+mtext("everything other than origins", 3, line=-1, cex=0.5)
 ```
-
 
 
 
@@ -475,7 +564,7 @@ mtext("all origins", 3, line=-1, cex=0.5)
 par(mfrow=c(4,6), mar=c(0,0,0,0), xaxt="n")
 for(h in 1:20){
 #h <- 3
-density_trend <- all_vectors[which(all_vectors[,1] == names(per.origin)[h]),]
+density_trend <- origins[which(origins[,1] == names(per.origin)[h]),]
 
 plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
 
@@ -496,6 +585,8 @@ ordered_subbed <- subbed[order(subbed$x_values), ]
 lines(as.numeric(ordered_subbed[,2]), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("cornflowerblue", 0.8))
 }
 mtext("all origins", 3, line=-1, cex=0.5)
+
+
 ```
 
 
@@ -661,8 +752,8 @@ for (j in 1:length(per.origin)) {
 }
 
 
-names(global.means) <- paste(names(per.origin), "Means")
-names(global.SD) <- paste(names(per.origin), "SD")
+names(global.means) <- names(per.origin)
+names(global.SD) <- names(per.origin)
 
 return(list(global.means, global.SD))
 }
@@ -670,32 +761,6 @@ return(list(global.means, global.SD))
 
 ```
 
-```{r}
-# Confirm that the x-axis is oriented correctly
-for_3 <- diff_df(1)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-i <- 1
-plot(4:21, global.means[[i]], col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", xaxt="n", type="n", ylim=c(0,1), xlim=c(0,20))
-
-
-polygon(x=22-c(Start_of_early_window, Start_of_early_window, End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("limegreen", alpha= 0.2), border=adjustcolor("limegreen", alpha= 0.9))
-
-polygon(x= 22-c( End_of_early_window_start_of_late_window, End_of_early_window_start_of_late_window, End_of_late_window, End_of_late_window) , y=c(-1, 2, 2, -1), col=adjustcolor("firebrick", alpha= 0.2), border=adjustcolor("firebrick", alpha= 0.9))
-
-originI <- Pop[per.origin[[i]][, 1], ]
-for(j in 1:18){
-points(23- c(jitter(rep(4, length(originI[,j])), 4.5)  + j), originI[,j], pch=19, cex=.1)
-}
-
-polygon(c(4:21,21:4) -3 , c(global.means[[i]] + abs(global.SD[[i]]), rev(global.means[[i]] - abs(global.SD[[i]]))), col="cornflowerblue")
-lines(global.means[[i]], type="b", pch=names(global.means[[i]]))
-
-axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-mtext(names(global.means)[1], 3, line=-2)
-
-```
 
 
 ```{r}
@@ -707,9 +772,6 @@ means_matrix[i,2:19] <- global.means[[i]]
 }
 ```
 
-```{r}
-kable(means_matrix, caption= "Mean values")
-```
 
 
 ```{r}
@@ -723,28 +785,7 @@ SD_matrix[i,2:19] <- global.SD[[i]]
 }
 ```
 
-```{r}
-kable(SD_matrix, caption= "SD values")
-```
 
-
-```{r}
-par(mfrow=c(4,5), mar=c(0,0,0,0))
-
-for(j in 1:20){
-plot(means_matrix[1,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[1,2:19]), type="n", xlab="year", ylab="Density", xaxt="n", ylim=c(0,1))
-
-originI <- Pop[per.origin[[j]][, 1], ]
-for(h in 1:18){
-points(23- c(jitter(rep(4, length(originI[,h])), 4.5)  + h), originI[,h], pch=19, cex=.1)
-}
-  
-lines(means_matrix[j,2:19], col=adjustcolor("cornflowerblue", alpha=0.8), pch=names(means_matrix[j,2:19]), type="b", xlab="year", ylab="Density", xaxt="n")
-}
-
-axis(1, at=seq(1,18, by=1), label=rev(seq(4, 21, by=1)))
-
-```
 
 
 
@@ -892,6 +933,15 @@ for (i in 1:length(means)) {
 
 ##Compare rates between origins and not-origins
 
+
+
+```{r}
+
+hist(as.numeric(not_origins[,4]), col=adjustcolor("cornflowerblue", alpha=.5),  breaks=100)
+hist(as.numeric(origins[,4]), add=TRUE, col=adjustcolor("limegreen", alpha=.5), breaks=100)
+```
+
+
 ##Compare rates between different time periods
 
 
@@ -917,32 +967,481 @@ frameplot <- function(){
 frameplot_bottom <- function(){
 	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(-3.25, 2), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
 }
+
+frameplot_flex <- function(min, max){
+	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(min, max), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
+}
+
+frameplot_bottom_flex <- function(min, max){
+	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(min, max), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
+}
+
 ```
-
-```{r}
-frameplot()
-frameplot_bottom()
-```
-
-
 
 
 
 ##Trend through time panel
 
 #### Setup the plot template for small panel plots (#6-17 on layout panel)
+
+```{r}
+#plot type 1
+lines_scaled_loess_no_zoom <- function(all_vectors, location){
+  #h <- 3
+
+  
+origins <- subset(all_vectors, location_name != "not_origins")
+density_trend <- origins[which(origins[,1] == location ),]
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+g <- 67404
+for(g in levels(as.factor(as.character(density_trend[,5])))){
+subbed <- subset(density_trend, cell_ID == as.numeric(g))
+subbed <- as.data.frame(subbed)
+class(subbed[,2]) <- "numeric"
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(ordered_subbed$x_values), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = 1)
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+
+lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+
+  
+}
+
+
+frameplot()
+lines_scaled_loess_no_zoom(all_vectors, "Fertile_Cresc")
+axis(2)
+```
+
+
+
+
+```{r}
+#plot type 2
+location <- "Fertile_Cresc"
+
+lines_not_scaled_loess_no_zoom <- function(all_vectors, location){
+  #plot type 1
+
+origins <- subset(all_vectors, location_name != "not_origins")
+density_trend <- origins[which(origins[,1] == location ),]
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+g <- 67404
+for(g in levels(as.factor(as.character(density_trend[,5])))){
+subbed <- subset(density_trend, cell_ID == as.numeric(g))
+subbed <- as.data.frame(subbed)
+class(subbed[,2]) <- "numeric"
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(ordered_subbed$x_values), as.numeric(as.character(ordered_subbed[,3])), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+
+ordered_density_trend <- density_trend[order(density_trend$x_values), ]
+
+gammer <- loess(as.numeric(as.character(ordered_density_trend[,3])) ~ as.numeric(ordered_density_trend[,2]), span = 1)
+summary(gammer)
+predict_gam <- predict(gammer, se=TRUE)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+
+lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+
+}
+
+	frameplot()
+lines_not_scaled_loess_no_zoom(all_vectors, "Fertile_Cresc")
+   axis(2)
+  
+
+```
+
+
+```{r}
+#plot type 3
+polygon_scaled_loess_no_zoom <- function(all_vectors, location){
+ 
+  
+ origin <- subset(all_vectors, location_name == location)
+ 
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+g <- 67404
+for(g in levels(as.factor(as.character(origin[,5])))){
+subbed <- subset(origin, cell_ID == as.numeric(g))
+subbed <- as.data.frame(subbed)
+class(subbed[,2]) <- "numeric"
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(ordered_subbed$x_values), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+levs <- levels(as.factor(as.character(origin[,5])))
+
+
+
+predictions <- matrix(rep(NA, length(levs)* 18), length(levs), 18)
+colnames(predictions) <- as.character(4:21)
+
+g <- "67404"
+i <- 1
+for(g in levs){
+subbed <- subset(origin, cell_ID == as.numeric(as.character(g)))
+
+model <- loess(as.numeric(subbed[,4]) ~ as.numeric(subbed[,2]), span = .5)
+    
+    predictions[i, ] <- predict(model, 1:18)
+i <- i + 1
+    }
+
+m <- colMeans(predictions)
+sd <- colSds(predictions)
+
+global.means <- m
+global.SD <- sd
+
+i <- which(names(global.means) == location)
+
+polygon(c( 21:4, 4:21) , c(global.means + abs(global.SD), rev(global.means - abs(global.SD))), col= adjustcolor("firebrick", alpha=.5), border=NA)
+lines(21:4 ,global.means, col="firebrick", lwd=2)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+
+#lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+ 
+  
+}
+
+frameplot()
+polygon_scaled_loess_no_zoom(all_vectors, "E_North_Ameri")
+```
+
+
+```{r}
+#plot type 4
+polygon_scaled_GAM_no_zoom <- function(all_vectors, location){
+ 
+  
+ origin <- subset(all_vectors, location_name == location)
+ 
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+g <- 67404
+for(g in levels(as.factor(as.character(origin[,5])))){
+subbed <- subset(origin, cell_ID == as.numeric(g))
+subbed <- as.data.frame(subbed)
+class(subbed[,2]) <- "numeric"
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(ordered_subbed$x_values), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+levs <- levels(as.factor(as.character(origin[,5])))
+
+
+
+predictions <- matrix(rep(NA, length(levs)* 18), length(levs), 18)
+colnames(predictions) <- as.character(4:21)
+
+g <- "67404"
+i <- 1
+for(g in levs){
+subbed <- subset(origin, cell_ID == as.numeric(as.character(g)))
+
+model <- gam(as.numeric(as.character(subbed[,4])) ~ s(as.numeric(as.character(subbed[,2])), df = 3)) 
+    
+    predictions[i, ] <- predict(model)
+i <- i + 1
+    }
+
+m <- colMeans(predictions)
+sd <- colSds(predictions)
+
+global.means <- m
+global.SD <- sd
+
+i <- which(names(global.means) == location)
+
+polygon(c( 4:21,  21:4) , c(global.means + abs(global.SD), rev(global.means - abs(global.SD))), col= adjustcolor("firebrick", alpha=.5), border=NA)
+lines(4:21 ,global.means, col="firebrick", lwd=2)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+
+#lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+ 
+  
+}
+
+frameplot()
+polygon_scaled_GAM_no_zoom(all_vectors, "E_North_Ameri")
+```
+
+
+```{r}
+#plot type 5
+polygon_scaled_loess_zoom <- function(all_vectors, location){
+ 
+  
+ origin <- subset(all_vectors, location_name == location)
+ 
+
+#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
+g <- 67404
+for(g in levels(as.factor(as.character(origin[,5])))){
+subbed <- subset(origin, cell_ID == as.numeric(g))
+subbed <- as.data.frame(subbed)
+class(subbed[,2]) <- "numeric"
+ordered_subbed <- subbed[order(subbed$x_values), ]
+lines(3+rev(ordered_subbed$x_values), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
+}
+
+
+levs <- levels(as.factor(as.character(origin[,5])))
+
+
+
+predictions <- matrix(rep(NA, length(levs)* 18), length(levs), 18)
+colnames(predictions) <- as.character(4:21)
+
+g <- "67404"
+i <- 1
+for(g in levs){
+subbed <- subset(origin, cell_ID == as.numeric(as.character(g)))
+
+model <- loess(as.numeric(subbed[,4]) ~ as.numeric(subbed[,2]), span = 1)
+    
+    predictions[i, ] <- predict(model, 1:18)
+i <- i + 1
+    }
+
+m <- colMeans(predictions)
+sd <- colSds(predictions)
+
+global.means <- m
+global.SD <- sd
+
+i <- which(names(global.means) == location)
+
+polygon(c( 21:4, 4:21) , c(global.means + abs(global.SD), rev(global.means - abs(global.SD))), col= adjustcolor("firebrick", alpha=.5), border=NA)
+lines(21:4 ,global.means, col="firebrick", lwd=2)
+
+
+
+abline(h=0, lty=2, col="grey")
+
+
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
+
+
+#lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
+
+ 
+  
+}
+
+origin <- subset(all_vectors, location_name == "E_North_Ameri")
+y_max <- max(origin[,4], na.rm=TRUE)
+y_min <- min(origin[,4], na.rm=TRUE)
+frameplot_flex(y_min,y_max)
+axis(2)
+polygon_scaled_loess_zoom(all_vectors, "E_North_Ameri")
+
+```
+
+
+
+
+```{r}
+location <- "Chinese_loess"
+
+gam_per_cell_not_scaled <- function(all_vectors, location){
+origin <- subset(all_vectors, location_name == location)
+levs <- levels(as.factor(as.character(origin[,5])))
+
+predictions <- matrix(rep(NA, length(levs)* 18), length(levs), 18)
+colnames(predictions) <- as.character(4:21)
+
+g <- "62493"
+i <- 1
+for(g in levs){
+subbed <- subset(origin, cell_ID == as.numeric(g))
+
+model <- gam(as.numeric(as.character(subbed[,3])) ~ s(as.numeric(subbed[,2]), df = 3))
+    
+    predictions[i, ] <- predict(model)
+i <- i + 1
+    }
+
+m <- colMeans(predictions)
+sd <- colSds(predictions)
+return(list(m, sd))
+
+}
+
+```
+
+
+
+```{r}
+#plot type 5
+polygon_not_scaled_gam_no_zoom <- function(all_vectors, location){
+ 
+#frameplot()  
+  for_3 <- gam_per_cell_not_scaled(all_vectors, location)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+#as.factor(all_vectors$location_name)
+#location <- "Chinese_loess"
+
+i <- which(names(global.means) == location)
+
+polygon(c( 4:21, 21:4) , c(global.means + abs(global.SD), rev(global.means - abs(global.SD))), col= adjustcolor("limegreen", alpha=.5))
+lines(4:21 ,global.means, col="limegreen", lwd=2)
+
+
+  
+}
+
+	plot(21:0,rep(0, 22), xlim=c(21,0), ylim=c(-0.5, 0.5), type="n", xaxt="n", yaxt="n", xlab="", ylab="")
+
+polygon_not_scaled_gam_no_zoom(all_vectors, "Fertile_Cresc")
+   axis(2)
+  
+
+```
+
+
+
+```{r}
+location <- "Chinese_loess"
+
+gam_per_cell_scaled <- function(all_vectors, location){
+origin <- subset(all_vectors, location_name == location)
+levs <- levels(as.factor(as.character(origin[,5])))
+
+predictions <- matrix(rep(NA, length(levs)* 18), length(levs), 18)
+colnames(predictions) <- as.character(4:21)
+
+g <- "62493"
+i <- 1
+for(g in levs){
+subbed <- subset(origin, cell_ID == as.numeric(g))
+
+model <- gam(as.numeric(subbed[,4]) ~ s(as.numeric(subbed[,2]), df = 3))
+    
+    predictions[i, ] <- predict(model)
+i <- i + 1
+    }
+
+m <- colMeans(predictions)
+sd <- colSds(predictions)
+return(list(m, sd))
+
+}
+
+```
+
+
+
+
+
+```{r}
+#plot type 6
+polygon_scaled_gam_no_zoom <- function(all_vectors, location){
+  
+#frameplot()  
+  for_3 <- gam_per_cell(all_vectors, location)
+global.means <- for_3[[1]]
+global.SD <- for_3[[2]]
+
+#as.factor(all_vectors$location_name)
+#location <- "Chinese_loess"
+
+i <- which(names(global.means) == location)
+
+polygon(c( 4:21, 21:4) , c(global.means + abs(global.SD), rev(global.means - abs(global.SD))), col= adjustcolor("limegreen", alpha=.5))
+lines(4:21 ,global.means, col="limegreen", lwd=2)
+
+
+  
+}
+
+frameplot()
+
+polygon_scaled_gam_no_zoom(all_vectors, "Fertile_Cresc")
+```
+
+
+```{r}
+#plot type 7
+polygon_scaled_gam_zoom <- function(all_vectors){
+  
+  
+}
+```
+
+
+
+
+
 ```{r}
 ###################
 
 type_number <- 8
 
-complex_figure <- function(type_number, location_name, i, means, sds){
+complex_figure <- function(type_number, location_name, i, means, sds, plot_type=4){
 		
 #polygon(x=c(-30,-30,30,30), y=c(-30,30,30,-30), col="black")  
   
 abline(h=0, lty=2)			
 
-if(i < 6)	polygon(x=c(12,12,8.2,8.2), y=c(-3,3,3,-3), col=adjustcolor("cornflowerblue", alpha=0.2), border=NA)					
+if(i < 6 )	polygon(x=c(12,12,8.2,8.2), y=c(-3,3,3,-3), col=adjustcolor("cornflowerblue", alpha=0.2), border=NA)					
 if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-3,3,3,-3), col=adjustcolor("cornflowerblue", alpha=0.2), border=NA)
 			
   
@@ -950,9 +1449,8 @@ if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-3,3,3,-3), col=adjustcolor("cornflo
 	maxer <- max(match, na.rm=TRUE)
 	break_one_1 <- maxer
 			break_two_1 <- maxer - quantile(j)[2]
-				
-#	polygon(x=c(break_two_1, break_two_1, break_one_1, break_one_1), y=c(0, 1, 1, 0), col=adjustcolor("cornflowerblue", alpha=0.5), border=NA)
-		lines(x=c(break_one_1, break_one_1), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=0.7), lwd=3)	
+
+		lines(x=c(break_one_1, break_one_1), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=0.7), lwd=3, lend = 2)	
 
   
   
@@ -962,7 +1460,7 @@ if(i > 5)	polygon(x=c(8.2,8.2,4.2,4.2), y=c(-3,3,3,-3), col=adjustcolor("cornflo
 			break_two_2 <- maxer - quantile(j)[2]
 				
 #	polygon(x=c(break_two_2, break_two_2, break_one_2, break_one_2), y=c(1, 2, 2, 1), col=adjustcolor("limegreen", alpha=0.5), border=NA)
-		lines(x=c(break_one_2, break_one_2), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=1), lwd=3)	
+		lines(x=c(break_one_2, break_one_2), y=c(-3,3), col=adjustcolor("cornflowerblue", alpha=1), lwd=3, lend = 2)	
 	
 		
   						
@@ -998,12 +1496,46 @@ polygon(c(0, x_seq), c(0, y_seq) -3, border="white", col=adjustcolor("cornflower
 	
 		
 
-		
+		if(plot_type == 1){
+	
+lines_scaled_loess_no_zoom(all_vectors, location_name)
+
+	}
 		
 		#abline(v=11)
-	type <- 3
+	
 		
-		if(type == 1){
+if(plot_type == 2){
+	
+lines_not_scaled_loess_no_zoom(all_vectors, location_name)
+
+	}
+
+
+if(plot_type == 3){
+	
+polygon_scaled_loess_no_zoom(all_vectors, location_name)
+
+	}
+
+if(plot_type == 4){
+	
+polygon_scaled_GAM_no_zoom(all_vectors, location_name)
+
+	}
+
+
+if(plot_type == 5){
+	
+
+polygon_scaled_loess_zoom(all_vectors, location_name)
+
+
+	}
+
+
+
+		if(plot_type == 9){
 	x <- c(means[[i]] , means[[i]]  + abs(sds[[i]]), means[[i]]  - abs(sds[[i]]))
 	scaled <- scale(x , center=TRUE)
 	meanss <- scaled[1:18]
@@ -1016,7 +1548,7 @@ polygon(c(0, x_seq), c(0, y_seq) -3, border="white", col=adjustcolor("cornflower
 	polygon(x=c(21:4,4:21), y=c(sdss_plus, rev(sdss_minus)), col=adjustcolor("firebrick", alpha=1), border="white")	
 	}
 	
-	if(type == 2){
+	if(plot_type == 8){
 #h <- 3
 density_trend <- all_vectors[which(all_vectors[,1] == location_name ),]
 
@@ -1051,69 +1583,21 @@ lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="fireb
 
 	}
 
-if(type == 3){
+if(plot_type == 10){
 	
-#h <- 3
-density_trend <- all_vectors[which(all_vectors[,1] == location_name ),]
+polygon_not_scaled_gam_no_zoom(all_vectors, location_name)
 
-#plot(as.numeric(density_trend[,2]), as.numeric(density_trend[,4]), col=adjustcolor("cornflowerblue", alpha=0.8),  xlab="year", ylab="Density", ylim=c(-2,2), xlim=c(4,21), type="n")
-
-for(g in levels(as.factor(density_trend[,5]))){
-subbed <- subset(density_trend, cell_ID == g)
-ordered_subbed <- subbed[order(subbed$x_values), ]
-lines(3+rev(as.numeric(ordered_subbed[,2])), as.numeric(ordered_subbed[,4]), lwd=.3, col=adjustcolor("limegreen", 0.3))
 }
 
 
-density_trend <- all_vectors[which(all_vectors[,1] == location_name),]
-ordered_density_trend <- density_trend[order(density_trend$x_values), ]
-
-gammer <- loess(as.numeric(ordered_density_trend[,4]) ~ as.numeric(ordered_density_trend[,2]), span = 1)
-summary(gammer)
-predict_gam <- predict(gammer, se=TRUE)
-
-
-
-abline(h=0, lty=2, col="grey")
-
-
-#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit + predict_gam$se.fit,  col="orange", lty=1, lwd=1)
-#lines(rev(ordered_density_trend[,2]) ,  predict_gam$fit - predict_gam$se.fit,  col="orange", lty=1, lwd=1)
-
-polygon(x=3+c(rev(ordered_density_trend[,2]), ordered_density_trend[,2] ), y=c(predict_gam$fit, rev(predict_gam$fit)), col=adjustcolor("firebrick", alpha=.5),bty="n", lwd=.2)
-lines(3+rev(as.numeric(ordered_density_trend[,2])) ,predict_gam$fit,  col="firebrick", lwd=1)
-
-
+if(plot_type == 11){
+	
+polygon_scaled_gam_no_zoom(all_vectors, location_name)
 
 	}
 
 	
-	
-#means_long_y <- c(1,1,1,1,1, meanss)
-#means_long_x <- c(0:4, 4:21)
- 
-		#	break_one <- break_one_2
-		#	break_two <- break_two_2
-		#		polygon(x=c(break_one, break_one, 22, 22), y=c(1, 2, 2, 1), col=adjustcolor("white", alpha=0.8), border=NA)
-		#		polygon(x=c(break_two, break_two, break_one, break_one), y=c(1, 2, 2, 1), col=adjustcolor("white", alpha=0), border=NA)
-			#	polygon(x=c(-1,-1, break_two , break_two), y=c(1.9, 3.1, 3.1, 1.9), col=adjustcolor("white", alpha=0.8), border=NA)	
-				#abline(v= break_one, col="white")
-				#abline(v= break_two, col="white")
-				
-			#	break_one <- break_one_1
-		#	break_two <- break_two_1
-		#		polygon(x=c(break_one, break_one, 22, 22), y=c(0, 1, 1, 0), col=adjustcolor("white", alpha=0.8), border=NA)
-		#		polygon(x=c(break_two, break_two, break_one, break_one), y=c(0, 1, 1, 0), col=adjustcolor("white", alpha=0), border=NA)
-			#	polygon(x=c(-1,-1, break_two , break_two), y=c(-1.1, .1, .1, -1.1), col=adjustcolor("white", alpha=0.8), border=NA)	
-				#abline(v= break_one, col="white")
-				#abline(v= break_two, col="white")
-				
-#lines(x=c(break_one_2, break_one_2), y=c(1,3), col="white")
-#lines(x=c(break_one_1, break_one_1), y=c(1,-1), col="white")
-#lines(x=c(break_two_2, break_two_2), y=c(1,3), col="white")
-#lines(x=c(break_two_1, break_two_1), y=c(1,-1), col="white") 
-#lines(4:21, meanss)
-	#lines(21:4, meanss)
+
 	
 }
 
@@ -1173,47 +1657,39 @@ abline(h=seq(1, 360, length.out = 19), col=adjustcolor("grey10", alpha= 0.4), lw
 abline(h=180, col=adjustcolor("white", alpha= .5), lwd=1)
 
 
-load('PopD_all_December.rdata')
-
-# Extract the data
-prod.origin <- extract(PopD.ALL, origins_subset)
-
-library(matrixStats)
-# Mean and SD per region
-means <- lapply(prod.origin, colMeans, na.rm = TRUE)
-sds <- lapply(prod.origin, colSds, na.rm = TRUE)
-
-## new values from Bruno's GAM model (produced in script called Population_Trend_per_y.R)
-for_3 <- diff_df(3)
-global.means <- for_3[[1]]
-global.SD <- for_3[[2]]
-
-means <- global.means
-sds <- global.gams
-
-names(means) <- origins_subset@data$CONTINENT
-ymax <- max(unlist(means))
-ymin <- min(unlist(means))
-time <- 4:21
-#plot(origins)
-#means[[1]] +
-#sds[[1]]
-#scale(as.numeric(means[[1]]), center=FALSE)
-
-name_vector <- as.character(origins_subset@data$CONTINENT)
 
 
+flexframe <- FALSE
 
 for(i in 1:12){
 
 	
+  flex_1 <- function(all_vectors, locations){
+    origin <- subset(all_vectors, location_name == locations)
+y_max <- max(origin[,4], na.rm=TRUE)
+y_min <- min(origin[,4], na.rm=TRUE)
+frameplot_flex(y_min,y_max)
 
-	if(i > 6){frameplot()}else{frameplot_bottom()}
+  }
+  
+  flex_2 <- function(all_vectors, locations){
+    origin <- subset(all_vectors, location_name == locations)
+y_max <- max(origin[,4], na.rm=TRUE)
+y_min <- min(origin[,4], na.rm=TRUE)
+frameplot_flex(y_min,y_max)
+
+    
+    
+  }
+
+  
+	if(flexframe == FALSE){if(i > 6){frameplot()}else{frameplot_bottom()}}
 
 	
 		## customize polygons for each graph
 	if(i == 1){ #mesoamerica  #values from Larson
 		
+	  if(flexframe == TRUE){flex_1(all_vectors, "Mesoamerica")}
 			complex_figure(3, "Mesoamerica", i, means, sds)
 				
 	
@@ -1222,7 +1698,7 @@ for(i in 1:12){
 	
 	#########
 	if(i == 2 ){ #NW lowlands SA  #values from Larson
-		
+		if(flexframe == TRUE){flex_1(all_vectors, "NW_Lowland_SA")}
 		complex_figure(6, "NW_Lowland_SA", i, means, sds)
 	
 
@@ -1230,7 +1706,7 @@ for(i in 1:12){
 		
 		#########
 	if( i == 3){ #NW lowlands SA  #values from Larson
-		
+		if(flexframe == TRUE){flex_1(all_vectors, "N_Lowland_SA")}
 		complex_figure(6, "N_Lowland_SA", i, means, sds)
 		
 		}
@@ -1239,14 +1715,14 @@ for(i in 1:12){
 		#########
 	if(i == 4){ #Fertile crescent aka Southwest asia  #values from Larson
 		
-		
+		if(flexframe == TRUE){flex_1(all_vectors, "Fertile_Cresc")}
 	complex_figure(8, "Fertile_Cresc", i, means, sds)
 				
 		}
 		
 		#########
 	if(i == 5){ #loess plateau  #values from Larson
-		
+		if(flexframe == TRUE){flex_1(all_vectors, "Chinese_loess")}
 		complex_figure(2, "Chinese_loess", i, means, sds)
 			
 		}
@@ -1254,7 +1730,7 @@ for(i in 1:12){
 		
 		#########
 	if(i == 6){ #new guinea  #values from Larson
-		
+		if(flexframe == TRUE){flex_1(all_vectors, "New_Guinea" )}
 		complex_figure(4, "New_Guinea", i, means, sds)
 		
 		}
@@ -1262,7 +1738,7 @@ for(i in 1:12){
 
 #########
 	if(i == 7){ #Eastern N.A.  #values from Larson
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "E_North_Ameri")}
 		complex_figure(5, "E_North_Ameri", i, means, sds)
 		
 			}
@@ -1270,7 +1746,7 @@ for(i in 1:12){
 
 		#########
 	if(i == 8){ #Andes  #values from Larson
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "C/S_Andes")}
 		complex_figure(6, "C/S_Andes", i, means, sds)
 		
 				}
@@ -1278,7 +1754,7 @@ for(i in 1:12){
 
 #########
 	if(i == 9){ #W. African Sav  #values from Larson
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "W_African_Sav")}
 		complex_figure(1, "W_African_Sav", i, means, sds)
 		
 			}
@@ -1286,7 +1762,7 @@ for(i in 1:12){
 
 #########
 	if(i == 10){ #Sudanic sav  #values from Larson
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "Sudanic_Savan")}
 		complex_figure(1, "Sudanic_Savan", i, means, sds)
 		
 				}
@@ -1295,7 +1771,7 @@ for(i in 1:12){
 #########
 	if(i == 11){ #Ganges  #values from Larson
 		
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "Ganges_E_Indi")}
 		complex_figure(7, "Ganges_E_Indi", i, means, sds) 
 		
 		}
@@ -1303,7 +1779,7 @@ for(i in 1:12){
 
 #########
 	if(i == 12){ #"Lower-MiddleY"  #values from Larson
-		
+		if(flexframe == TRUE){flex_2(all_vectors, "Lower-MiddleY")}
 		complex_figure(2, "Lower-MiddleY", i, means, sds)
 		 
 		 		}

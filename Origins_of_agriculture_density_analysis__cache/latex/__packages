@@ -1,0 +1,12 @@
+base
+png
+sp
+maptools
+raster
+foreach
+gam
+maps
+mapproj
+rgl
+knitr
+rgdal
